@@ -1,0 +1,12 @@
+languages:
+  - name: abl
+  - name: progress  
+component_base_dirs:
+  - "src/Pmfo"
+  - "src/OpenEdge"
+  - "src/Spark"
+  - "tools-src"
+architecture:
+   - enabled: true 
+thirdparyfindings:
+   - enabled: false 
