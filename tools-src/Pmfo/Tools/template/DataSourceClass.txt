@@ -1,0 +1,14 @@
+block-level on error undo, throw.
+
+using Pmfo.Core.DataLayer.DataSource from propath.
+&1
+class &2 inherits DataSource: 
+    {&3 reference-only}  
+    
+    define public override property EntityName as char init "&4" no-undo get.
+        
+    constructor public &5 (  ):
+        super (&6).
+    end constructor.
+&7    
+end class.

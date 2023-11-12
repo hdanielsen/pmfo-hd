@@ -1,0 +1,406 @@
+{"resources": {
+  "businessEntities": [
+    {
+      "Resource": "actions",
+      "ClassName": "Business.ActionBE",
+      "Public": true,
+      "ReadOnly": false,
+      "CanCreate": true,
+      "CanDelete": true
+    },
+    {
+      "Resource": "adderReqs",
+      "ClassName": "Business.AdderReqBE",
+      "Public": true,
+      "ReadOnly": false,
+      "CanCreate": true,
+      "CanDelete": true
+    },
+    {
+      "Resource": "adjustments",
+      "ClassName": "Business.AdjustmentBE",
+      "Public": true,
+      "ReadOnly": false,
+      "CanCreate": true,
+      "CanDelete": true
+    },
+    {
+      "Resource": "agedInvCustonBoards",
+      "ClassName": "Business.AgedInvCustonBoardBE",
+      "Public": true,
+      "ReadOnly": false,
+      "CanCreate": true,
+      "CanDelete": true
+    },
+    {
+      "Resource": "agedInventoryReportFormats",
+      "ClassName": "Business.AgedInventoryReportFormatBE",
+      "Public": true,
+      "ReadOnly": false,
+      "CanCreate": true,
+      "CanDelete": true
+    },
+    {
+      "Resource": "agedStorageDates",
+      "ClassName": "Business.AgedStorageDateBE",
+      "Public": true,
+      "ReadOnly": false,
+      "CanCreate": true,
+      "CanDelete": true
+    },
+    {
+      "Resource": "agingHoldSetups",
+      "ClassName": "Business.AgingHoldSetupBE",
+      "Public": true,
+      "ReadOnly": false,
+      "CanCreate": true,
+      "CanDelete": true
+    },
+    {
+      "Resource": "alarms",
+      "ClassName": "Business.AlarmBE",
+      "Public": true,
+      "ReadOnly": false,
+      "CanCreate": true,
+      "CanDelete": true
+    },
+    {
+      "Resource": "alarmTriggers",
+      "ClassName": "Business.AlarmTriggerBE",
+      "Public": true,
+      "ReadOnly": false,
+      "CanCreate": true,
+      "CanDelete": true
+    },
+    {
+      "Resource": "alertGroups",
+      "ClassName": "Business.AlertGroupBE",
+      "Public": true,
+      "ReadOnly": false,
+      "CanCreate": true,
+      "CanDelete": true
+    },
+    {
+      "Resource": "altAddresses",
+      "ClassName": "Business.AltAddressBE",
+      "Public": true,
+      "ReadOnly": false,
+      "CanCreate": true,
+      "CanDelete": true
+    },
+    {
+      "Resource": "converts",
+      "ClassName": "Business.ConvertBE",
+      "Public": true,
+      "ReadOnly": false,
+      "CanCreate": true,
+      "CanDelete": true
+    },
+    {
+      "Resource": "customers",
+      "ClassName": "Business.CustomerBE",
+      "Public": true,
+      "ReadOnly": false,
+      "CanCreate": true,
+      "CanDelete": true
+    },
+    {
+      "Resource": "notes",
+      "ClassName": "Business.NoteBE",
+      "Public": false,
+      "ReadOnly": false,
+      "CanCreate": true,
+      "CanDelete": true
+    },
+    {
+      "Resource": "partnerConfigActWdthFactors",
+      "ClassName": "Business.PartnerConfigActWdthFactorBE",
+      "Public": true,
+      "ReadOnly": false,
+      "CanCreate": true,
+      "CanDelete": true
+    },
+    {
+      "Resource": "partnerConfigSpecOptions",
+      "ClassName": "Business.PartnerConfigSpecOptionsBE",
+      "Public": true,
+      "ReadOnly": false,
+      "CanCreate": true,
+      "CanDelete": true
+    },
+    {
+      "Resource": "partnerConfigWeighOptions",
+      "ClassName": "Business.PartnerConfigWeighOptionBE",
+      "Public": true,
+      "ReadOnly": false,
+      "CanCreate": true,
+      "CanDelete": true
+    },
+    {
+      "Resource": "partners",
+      "ClassName": "Business.PartnerBE",
+      "Public": true,
+      "ReadOnly": false,
+      "CanCreate": true,
+      "CanDelete": true
+    },
+    {
+      "Resource": "picklists",
+      "ClassName": "Business.PicklistBE",
+      "Public": true,
+      "ReadOnly": false,
+      "CanCreate": true,
+      "CanDelete": true
+    },
+    {
+      "Resource": "plantReferences",
+      "ClassName": "Business.PlantReferenceBE",
+      "Public": true,
+      "ReadOnly": false,
+      "CanCreate": true,
+      "CanDelete": true
+    },
+    {
+      "Resource": "plants",
+      "ClassName": "Business.PlantBE",
+      "Public": true,
+      "ReadOnly": false,
+      "CanCreate": true,
+      "CanDelete": true
+    },
+    {
+      "Resource": "receivingHours",
+      "ClassName": "Business.ReceivingHourBE",
+      "Public": true,
+      "ReadOnly": false,
+      "CanCreate": true,
+      "CanDelete": true
+    },
+    {
+      "Resource": "uomService",
+      "ClassName": "Business.UomServiceBE",
+      "Public": true,
+      "ReadOnly": false,
+      "CanCreate": true,
+      "CanDelete": true
+    },
+    {
+      "Resource": "uomUses",
+      "ClassName": "Business.UomUsesBE",
+      "Public": true,
+      "ReadOnly": false,
+      "CanCreate": true,
+      "CanDelete": true
+    }
+  ],
+  "dataSources": [
+    {
+      "EntityName": "actions",
+      "TableName": "Action",
+      "TypeKey": "",
+      "FieldMap": "",
+      "Type": "Table",
+      "ClassName": ""
+    },
+    {
+      "EntityName": "adderReqs",
+      "TableName": "AdderReqs",
+      "TypeKey": "",
+      "FieldMap": "",
+      "Type": "Table",
+      "ClassName": ""
+    },
+    {
+      "EntityName": "agedInvCustonBoards",
+      "TableName": "",
+      "TypeKey": "AGED INV CUST - \"ON BOARD\"",
+      "FieldMap": "",
+      "Type": "CodeTable",
+      "ClassName": ""
+    },
+    {
+      "EntityName": "agedInventoryReportFormats",
+      "TableName": "",
+      "TypeKey": "AGED INVENTORY REPORT FORMAT",
+      "FieldMap": "",
+      "Type": "CodeTable",
+      "ClassName": ""
+    },
+    {
+      "EntityName": "agedStorageDates",
+      "TableName": "",
+      "TypeKey": "Aged Storage Date",
+      "FieldMap": "",
+      "Type": "CodeTable",
+      "ClassName": ""
+    },
+    {
+      "EntityName": "agingHoldSetups",
+      "TableName": "",
+      "TypeKey": "Aging Hold Setup",
+      "FieldMap": "field1,misc1,field2,misc2,field3,misc3",
+      "Type": "CodeTable",
+      "ClassName": ""
+    },
+    {
+      "EntityName": "alarms",
+      "TableName": "",
+      "TypeKey": "",
+      "FieldMap": "",
+      "Type": "Class",
+      "ClassName": "DataSource.AlarmDS"
+    },
+    {
+      "EntityName": "alarmTriggers",
+      "TableName": "",
+      "TypeKey": "",
+      "FieldMap": "",
+      "Type": "Class",
+      "ClassName": "DataSource.AlarmTriggerDS"
+    },
+    {
+      "EntityName": "alertGroups",
+      "TableName": "AlertGroup",
+      "TypeKey": "",
+      "FieldMap": "",
+      "Type": "Table",
+      "ClassName": ""
+    },
+    {
+      "EntityName": "altAddresses",
+      "TableName": "AltAddress",
+      "TypeKey": "",
+      "FieldMap": "",
+      "Type": "Table",
+      "ClassName": ""
+    },
+    {
+      "EntityName": "converts",
+      "TableName": "Convert",
+      "TypeKey": "",
+      "FieldMap": "",
+      "Type": "Table",
+      "ClassName": ""
+    },
+    {
+      "EntityName": "customers",
+      "TableName": "",
+      "TypeKey": "",
+      "FieldMap": "",
+      "Type": "Class",
+      "ClassName": "DataSource.CustomerDS"
+    },
+    {
+      "EntityName": "notes",
+      "TableName": "note",
+      "TypeKey": "",
+      "FieldMap": "",
+      "Type": "Table",
+      "ClassName": ""
+    },
+    {
+      "EntityName": "partnerConfigActWdthFactors",
+      "TableName": "",
+      "TypeKey": "PARTNER.CFG[4]:ACT WDTH FACTOR",
+      "FieldMap": "",
+      "Type": "CodeTable",
+      "ClassName": ""
+    },
+    {
+      "EntityName": "partnerConfigSpecOptions",
+      "TableName": "",
+      "TypeKey": "PARTNER.CFG[5]:SPEC OPTIONS",
+      "FieldMap": "",
+      "Type": "CodeTable",
+      "ClassName": ""
+    },
+    {
+      "EntityName": "partnerConfigWeighOptions",
+      "TableName": "",
+      "TypeKey": "PARTNER.CFG[3]:WEIGH OPTION",
+      "FieldMap": "",
+      "Type": "CodeTable",
+      "ClassName": ""
+    },
+    {
+      "EntityName": "partners",
+      "TableName": "",
+      "TypeKey": "",
+      "FieldMap": "",
+      "Type": "Class",
+      "ClassName": "DataSource.PartnerDS"
+    },
+    {
+      "EntityName": "picklists",
+      "TableName": "picklist",
+      "TypeKey": "",
+      "FieldMap": "OwnerID,rcpt.own-inv-id",
+      "Type": "Table",
+      "ClassName": ""
+    },
+    {
+      "EntityName": "plantReferences",
+      "TableName": "",
+      "TypeKey": "",
+      "FieldMap": "",
+      "Type": "Class",
+      "ClassName": "DataSource.PlantReferenceDS"
+    },
+    {
+      "EntityName": "plants",
+      "TableName": "",
+      "TypeKey": "",
+      "FieldMap": "",
+      "Type": "Class",
+      "ClassName": "DataSource.PlantDS"
+    },
+    {
+      "EntityName": "receivingHours",
+      "TableName": "",
+      "TypeKey": "",
+      "FieldMap": "",
+      "Type": "Class",
+      "ClassName": "DataSource.ReceivingHourDS"
+    },
+    {
+      "EntityName": "uoms",
+      "TableName": "",
+      "TypeKey": "",
+      "FieldMap": "",
+      "Type": "Class",
+      "ClassName": "DataSource.UomDS"
+    },
+    {
+      "EntityName": "uomUomUseReferences",
+      "TableName": "",
+      "TypeKey": "",
+      "FieldMap": "",
+      "Type": "Class",
+      "ClassName": "DataSource.XrfUomUomUseDS"
+    },
+    {
+      "EntityName": "UomUseReferences",
+      "TableName": "",
+      "TypeKey": "",
+      "FieldMap": "",
+      "Type": "Class",
+      "ClassName": "DataSource.UomUseReferenceDS"
+    },
+    {
+      "EntityName": "UomUseReferences_2",
+      "TableName": "",
+      "TypeKey": "",
+      "FieldMap": "",
+      "Type": "Class",
+      "ClassName": "DataSource.UomUseReferenceDS_2"
+    },
+    {
+      "EntityName": "uomUses",
+      "TableName": "",
+      "TypeKey": "UOM Uses",
+      "FieldMap": "",
+      "Type": "CodeTable",
+      "ClassName": ""
+    }
+  ]
+}}

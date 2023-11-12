@@ -1,0 +1,7 @@
+    method override protected void PrepareBuffer( input pBuffer as handle ):
+        define variable hTable as handle no-undo.
+        pBuffer:set-callback("After-Row-fill","AfterRow").
+        hTable = pBuffer:table-handle.
+        Bind (table-handle hTable bind).        
+    end method.
+    
