@@ -1,0 +1,3 @@
+    method void Bind( input table &1):
+    end method.
+    

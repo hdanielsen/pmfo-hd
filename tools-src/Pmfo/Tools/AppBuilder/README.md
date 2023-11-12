@@ -1,0 +1,1 @@
+# AppBuilder source is code that must be launched in OpenEdge project in order to be able to open and convert Appbuilder artifacts  

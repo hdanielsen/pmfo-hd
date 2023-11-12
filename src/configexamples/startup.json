@@ -1,0 +1,12 @@
+{
+  "ManagerMapping": [
+    {
+      "Manager": "Ccs.Common.IServiceManager",
+      "Implementation": "Psi.Core.Manager.ServiceManager"
+    },
+    {
+      "Manager": "Ccs.Common.ISessionManager",
+      "Implementation": "Psi.Core.Manager.SessionManager"
+    }
+  ]
+}

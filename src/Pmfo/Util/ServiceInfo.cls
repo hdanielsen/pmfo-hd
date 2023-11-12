@@ -1,0 +1,412 @@
+ 
+ /*------------------------------------------------------------------------
+    File        : ServiceInfo
+    Purpose     : 
+    Syntax      : 
+    Description : 
+    Author(s)   : hdaniels
+    Created     : Mon Oct 17 16:41:55 EDT 2022
+    Notes       : 
+  ----------------------------------------------------------------------*/
+ 
+
+block-level on error undo, throw.
+
+using Ccs.Common.Application from propath.
+using OpenEdge.Core.StringConstant from propath.
+using Pmfo.Core.Common.FieldValue from propath.
+using Pmfo.Core.Common.IFieldValue from propath.
+using Pmfo.Core.Common.IKey from propath.
+using Pmfo.Core.Common.Key from propath.
+using Pmfo.Core.Error.IllegalArgumentError from propath.
+using Pmfo.Core.Error.IllegalOperationError from propath.
+using Pmfo.Core.Manager.IServiceManager from propath.
+using Pmfo.Util.BufferUtil from propath.
+using Pmfo.Util.PrimitiveHolderUtil from propath.
+using Pmfo.Util.StringUtil from propath.
+using Progress.Json.ObjectModel.JsonObject from propath.
+using Pmfo.Core.Error.NotFoundError from propath.
+using Progress.Lang.Error from propath.
+
+class Pmfo.Util.ServiceInfo: 
+    
+    define private static property ServiceManager as IServiceManager no-undo 
+        get():
+            return  cast(Application:ServiceManager,IServiceManager). 
+        end.     
+        
+    method public static character GetKeys (pcSerializeName as character):
+        return ServiceManager:GetKeyList(pcSerializeName).
+    end method.
+    
+    method public static character GetKeys (phBuffer as handle):
+        
+        define variable oError as Error no-undo.
+        define variable cMsg as character no-undo. 
+        
+        if not valid-handle(phBuffer) or phBuffer:type <> "Buffer" then 
+            undo, throw new IllegalArgumentError("Buffer parameter is not valid or not a Buffer").  
+        return GetKeys(phBuffer:table-handle:serialize-name).
+        catch e as NotFoundError :
+            return HandleNotFoundForBuffer(phBuffer, e).    
+        end catch.
+    end method.
+    
+    method public static character GetPublicKeys (phBuffer as handle):
+        define variable hFields as handle extent no-undo.
+        define variable i            as integer no-undo.  
+        define variable iCount       as integer no-undo.
+        define variable cNames       as character no-undo.
+        define variable cDlm         as character no-undo.
+        
+        hFields = GetKeyHandles(phBuffer).
+        iCount = extent(HFields).
+        if iCount > 0 then 
+        do:
+            do i = 1 to iCount:
+                cNames = subst("&1&2&3",cNames,cDlm,hFields[i]:serialize-name).
+                cDlm   = ",".
+            end.
+        end. 
+        return cNames.
+        catch e as NotFoundError :
+            return HandleNotFoundForBuffer(phBuffer, e).    
+        end catch.
+    end method.
+    
+    method public static handle extent GetKeyHandles (phBuffer as handle):
+        define variable cKeys   as character no-undo.
+        define variable i as integer no-undo.  
+        define variable hFields as handle extent no-undo.
+        define variable iCount as integer no-undo.
+        
+        cKeys = GetKeys(phBuffer).
+        
+        if cKeys > "" then
+        do:  
+            iCount = num-entries(cKeys).
+            extent(hFields) = iCount.
+            do i = 1 to iCount:
+                hFields[i] = phBuffer:buffer-field(entry(i,cKeys)).  
+            end.
+        end.   
+        return hFields. 
+    end method.     
+    
+    method public static handle extent GetRelationFieldHandles (phRelation as handle, output phParentFields as handle extent,output phChildFields as handle extent):
+        define variable oFieldValues   as IFieldValue extent no-undo.
+        define variable cParentKeys    as character no-undo.
+        define variable cChildKeys     as character  no-undo.
+        define variable i              as integer no-undo.  
+        define variable iCount         as integer no-undo.
+        define variable cValue         as character no-undo.
+        
+        if phRelation:type <> "DATA-RELATION" then 
+            undo, throw new IllegalOperationError("Parameter is not a data relation").
+       
+        if phRelation:parent-buffer:avail = false then 
+            undo, throw new IllegalOperationError(subst("Parent Buffer &1 is not available",phRelation:parent-buffer:name)).
+  
+        BufferUtil:SplitJoinFields(phRelation, output cParentKeys, output cChildKeys).
+        
+        iCount = num-entries(cParentKeys).
+        if iCount > 0  then
+        do:  
+            extent(phParentFields) = iCount.
+            extent(phChildFields)  = iCount.
+            do i = 1 to iCount:
+                phParentFields[i] = phRelation:parent-buffer:buffer-field(entry(i,cParentKeys)).
+                phChildFields[i]  = phRelation:child-buffer:buffer-field(entry(i,cChildKeys)).
+            end.
+        end.  
+    end method.     
+    
+    method public static character GetChildKeys (phBuffer as handle):
+        return GetChildKeys(phBuffer,false). 
+    end method. 
+    
+    method public static character GetPublicChildKeys (phBuffer as handle):
+        return GetChildKeys(phBuffer,true).
+    end method. 
+     
+    method private static character GetChildKeys (phBuffer as handle,plPublic as logical):
+        define variable cKeys        as character no-undo.
+        define variable cField       as character no-undo.
+        define variable cChildFields as character no-undo.
+        define variable i            as integer no-undo.
+        define variable cChildKeys   as character no-undo.
+        
+        if plPublic then 
+            ckeys = GetPublicKeys(phBuffer).
+        else     
+           ckeys = GetKeys(phBuffer).
+           
+        if cKeys > "" then 
+        do:
+            if valid-handle(phBuffer:parent-relation) and phBuffer:parent-relation:active then 
+            do:  
+                cChildFields = BufferUtil:GetChildJoinFields(phBuffer:parent-relation, plPublic).
+                cChildKeys   = cKeys.    
+                do i = 1 to num-entries(cChildFields):
+                     cField = entry(i,cChildFields).
+                     if lookup(cField,cKeys) > 0 then 
+                         cChildKeys = StringUtil:RemoveEntryFromList(cField, cChildKeys).
+                     else // if a field is not fopund return keys as-is
+                         return cKeys.                 
+                end.
+                return cChildKeys.
+            end. 
+        end.
+        return cKeys.    
+    end method.
+    
+    method public static IKey GetPublicKey (phBuffer as handle):
+        define variable oFieldValues as IFieldValue extent no-undo.
+        define variable hFields      as handle extent no-undo.
+        define variable i            as integer no-undo.  
+        define variable iCount       as integer no-undo.
+        if phbuffer:avail = false then 
+           undo, throw new IllegalOperationError(subst("Buffer &1 is not available",phBuffer:name )).
+       
+        hFields = GetKeyHandles(phBuffer).
+        iCount = extent(HFields).
+        if iCount > 0 then 
+        do:
+            extent(oFieldValues) = iCount.
+            do i = 1 to iCount:
+                oFieldValues[i] = new FieldValue(hFields[i]:serialize-name,PrimitiveHolderUtil:GetHolder(hFields[i])).
+            end.
+            return new Key(oFieldValues). 
+        end.
+        return ?.    
+    end method.
+    
+    method public static IKey GetKey (phBuffer as handle):
+        define variable oFieldValues as IFieldValue extent no-undo.
+        define variable hFields      as handle extent no-undo.
+        define variable i            as integer no-undo.  
+        define variable iCount       as integer no-undo.
+        if phbuffer:avail = false then 
+           undo, throw new IllegalOperationError(subst("Buffer &1 is not available",phBuffer:name )).
+       
+        hFields = GetKeyHandles(phBuffer).
+        iCount = extent(HFields).
+        if iCount > 0 then 
+        do:
+            extent(oFieldValues) = iCount.
+            do i = 1 to iCount:
+                oFieldValues[i] = new FieldValue(hFields[i]:name,PrimitiveHolderUtil:GetHolder(hFields[i])).
+            end.
+            return new Key(oFieldValues). 
+        end.
+        return ?.    
+    end method.
+    
+    //returns a key to find a child from parent
+    method public static IKey GetForeignKey (phRelation as handle):
+        define variable oFieldValues   as IFieldValue extent no-undo.
+        define variable hParentFields  as handle extent no-undo.
+        define variable hChildFields    as handle extent no-undo.
+        define variable i              as integer no-undo.  
+        define variable iCount         as integer no-undo.
+        define variable cValue         as character no-undo.
+        
+        
+        GetRelationFieldHandles(phRelation, output hParentFields, output hChildFields).
+        iCount = extent(hParentFields).
+        if iCount > 0  then
+        do:  
+            extent(oFieldValues) = iCount.
+            do i = 1 to iCount:
+                cValue = hParentFields[i]:buffer-value.
+                oFieldValues[i] = new FieldValue(hChildFields[i]:name,PrimitiveHolderUtil:GetHolder(hChildFields[i])).
+            end.
+            return new Key(oFieldValues). 
+        end.
+        return ?.    
+    end method.
+    
+    method public static character ConvertSingleKeyToExpression (phbuffer as handle, pcExpression as character, plUsePublicName as logical, plCheckJoin as logical):
+        return ConvertSingleKeyToExpression(phbuffer, pcExpression, plUsePublicName, plCheckJoin, false).
+    end method.
+         
+    method public static character ConvertSingleKeyToExpression (phbuffer as handle, pcExpression as character, plUsePublicName as logical, plCheckJoin as logical, plEqualsAsString as logical) :
+        define variable lKeyOnly     as logical no-undo.
+        define variable cKey         as character no-undo.
+        define variable cDisplayKeys as character no-undo.
+    
+        if pcExpression begins "'" 
+        or pcExpression begins '"' then 
+        do:
+            lKeyOnly = true.
+        end. 
+        else do:
+            lKeyOnly =  index(pcExpression,StringConstant:SPACE) = 0 and index(pcExpression,"=") = 0.
+        end.
+        if lKeyOnly then 
+        do:
+            if plUsePublicName then
+            do: 
+                if plCheckJoin then
+                    cKey = GetPublicChildKeys(phBuffer).
+                else 
+                    cKey = GetPublicKeys(phBuffer).
+            end.
+            else do:    
+                if plCheckJoin then
+                    cKey = GetChildKeys(phBuffer).
+                else 
+                    cKey = GetKeys(phBuffer).
+            end.
+            if cKey = "" then 
+                undo, throw new IllegalArgumentError(subst("Cannot use key without field name in request for collection '&1'",phBuffer:serialize-name)).
+            
+            if num-entries(cKey) > 1 then 
+            do: 
+                if plCheckJoin then
+                    cDisplayKeys = GetPublicChildKeys(phBuffer).
+                else 
+                    cDisplayKeys = GetPublicKeys(phBuffer).
+                undo, throw new IllegalArgumentError(subst("Single key request '(&1)' used with collection '&2' which has multi-column key '&3'",pcExpression,phBuffer:serialize-name,cKey)).
+            end.
+            return subst("&1&2&3",cKey,if plEqualsAsString then " eq " else "=",pcExpression).
+        end.     
+        return pcExpression. 
+    end method.     
+    
+    method public static JsonObject GetJsonKey(phBuffer as handle):
+        define variable cKeys           as character no-undo.
+        define variable iField          as integer no-undo.
+        define variable cFld            as character no-undo.
+        define variable hFld            as handle no-undo.
+       
+        define variable oJson           as JsonObject no-undo. 
+        
+        cKeys = GetKeys(phBuffer).
+        if ckeys = "" then
+            undo, throw new IllegalOperationError(subst("Cannot generate Json key for &1 with no unique key",phBuffer:name)).               
+        oJson = new JsonObject().       
+        do iField = 1 to num-entries(cKeys).
+            assign
+                cfld = entry(iField,cKeys)
+                hFld = phBuffer:buffer-field(cfld).
+            oJson:Add(hFld:serialize-name,hFld:buffer-value).
+       end.      
+                               
+       return oJson. 
+    end method.      
+    
+    method public static character GetUrlRowKey(phBuffer as handle):
+        return GetStringRowKey(phBuffer, "Url").
+    end method.
+    
+    method public static character GetUrlQueryRowKey(phBuffer as handle):
+        return GetStringRowKey(phBuffer, "UrlQuery").
+    end method.
+    
+    method public static character GetLabeledKey(phBuffer as handle):
+        return GetStringRowKey(phBuffer, "Text").
+    end method.
+    
+     method private static character GetStringRowKey(phBuffer as handle, pcQueryOption as character):
+        define variable cKeys           as character no-undo.
+        define variable iField          as integer no-undo.
+        define variable cFld            as character no-undo.
+        define variable hFld            as handle no-undo.
+        define variable cValue          as character no-undo.
+        define variable lHasSpaceOrPlus as logical no-undo.
+        define variable cRowKey         as character no-undo.
+        define variable cExpressionSep  as character no-undo.
+        define variable cPredicateSep   as character no-undo.
+        define variable lUseLabel      as logical no-undo.
+        if pcQueryOption = "UrlQuery" then
+        do: 
+           assign 
+              cExpressionSep = " eq "
+              cPredicateSep  = " and ". 
+        end.
+        else if pcQueryOption = "Url" then
+        do: 
+           assign 
+              cExpressionSep = "="
+              cPredicateSep  = ",". 
+        end.
+        else if pcQueryOption = "text" then
+        do: 
+           assign 
+              cPredicateSep = " and ".
+              lUseLabel = true. 
+        end.    
+         
+        cKeys = GetKeys(phBuffer).
+        if ckeys = "" then
+            undo, throw new IllegalOperationError(subst("Cannot generate &1 key for &2 with no unique key",pcQueryOption,phBuffer:name)).               
+               
+        do iField = 1 to num-entries(cKeys).
+            assign
+                cfld = entry(iField,cKeys)
+                hFld = phBuffer:buffer-field(cfld).
+            if hFld:data-type begins "date" then
+            do:
+                 cValue = quoter(iso-date(hFld:buffer-value),"'").
+            end.
+            else if (hfld:data-type = "character" or hFld:data-type = "longchar") then
+            do:
+                assign
+                    cValue = hFld:buffer-value
+                    lHasSpaceOrPlus = index(cValue,StringConstant:SPACE) > 0 or index(cValue,"+") > 0
+                    cValue      = quoter(cValue,"'")
+                    .
+           end.        
+           else
+               cValue = hFld:buffer-value.
+                           
+           /* if hasspaceorplus use field name in expression so we can safely decode bad encoders like certain REST testing tools...
+              some REST tools will encode space as +, but not if there already is a + 
+              this is indeterministic since a value with + and no space could origin from both space and +
+           */     
+           if num-entries(cKeys) = 1 and lHasSpaceOrPlus = false and lUseLabel = false then 
+           do:
+               cRowKey = cValue.
+           end.
+           else if luselabel = false then
+           do:
+               cRowKey = cRowKey 
+                           + (if cRowKey = "" then "" else cPredicateSep)
+                           + subst("&1&2&3",
+                                   hFld:serialize-name,
+                                   cExpressionSep,
+                                   cValue
+                                  ).
+           end.
+           else do:
+               cRowKey = cRowKey 
+                           + (if cRowKey = "" then "" else cPredicateSep)
+                           + subst("&1: &2",
+                                   Pmfo.Util.BufferUtil:GetFieldLabel(hFld),
+                                   cValue
+                                  ).
+           end.
+           
+       end.                              
+       return cRowKey. 
+    end method.    
+    
+     method private static character HandleNotFoundForBuffer(phBuffer as handle, pError as Error): 
+        define variable cMSg as character no-undo.
+        if ServiceManager:CanFindDataSource(phBuffer:table-handle:serialize-name) then 
+        do:
+            cMsg = subst("ServiceInfo:GetKeys call for buffer &1 was resolved using BufferUtil:GetInternalKeys. A Business Entity should be defined for buffers that need to expose a key in the application layer.",phBuffer:name).
+            if session:remote then
+                message cMsg. //?? where does this end up 
+            else 
+                message cMsg 
+                view-as alert-box warning.
+                    
+            return BufferUtil:GetInternalKeys(phBuffer).
+        end.
+        else 
+            undo, throw pError. 
+    end method.    
+    
+end class.
