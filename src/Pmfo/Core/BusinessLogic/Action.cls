@@ -33,7 +33,7 @@ using Pmfo.Core.Service.IClientRequest from propath.
 
 class Pmfo.Core.BusinessLogic.Action inherits Method implements IAction: 
     define public override property BaseTypeName  as character no-undo init "Action" get.
-    
+    define private property TestTESt as character no-undo get.
     //  return @success if successful. Row type is currently used to create message text
     define public property SuccessRowState as RowStateEnum no-undo get. set.
       
