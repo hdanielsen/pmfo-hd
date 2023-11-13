@@ -8,5 +8,5 @@ component_base_dirs:
   - "tools-src"
 architecture:
    - enabled: true 
-thirdparyfindings:
-   - enabled: false 
+thirdpartyfindings:
+   - enabled: true 
