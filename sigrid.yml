@@ -7,6 +7,6 @@ component_base_dirs:
   - "src/Spark"
   - "tools-src"
 architecture:
-   - enabled: true 
+  enabled: true 
 thirdpartyfindings:
-   - enabled: true 
+  enabled: true 
