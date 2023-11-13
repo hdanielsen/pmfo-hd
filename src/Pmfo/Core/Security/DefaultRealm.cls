@@ -54,38 +54,7 @@ genspacp -password <text> [-user <text> -role <text> -domain <text> -file <text>
     constructor public DefaultRealm (  ):
         super ().
     end constructor.
-    
-    
-    /*------------------------------------------------------------------------------
-     Purpose: Returns true if the C-P received in the request is valid, else returns false
-     Notes: Uses "password" value configured in spaservice.properties to validate the C-P
-    --------------------------------------------------------------------------------- */
-    method protected logical ValidateClient(  ):
-        
-        define variable result as logical no-undo initial false.
-        define variable hCP as handle no-undo.
-        define variable i as integer no-undo. 
-        define variable lok as logical no-undo.
-        hCP = session:current-request-info:GetClientPrincipal().
-        if (? <> hCP) then 
-        do:
-            message "Request contained a C-P".
-            lok = hCP:validate-seal ("a").
-           message "Validation with seal is ok?" lok.
-        end. 
-        else
-            message "Request did not contain a C-P".
-
-        if result = true then 
-        do:
-           // if hCP:roles <> m_role then 
-            //    result = false.
-        end.    
-        
-        return true.
-
-    end method.
-
+ 
     /*------------------------------------------------------------------------------
      Purpose: Returns the attribute value of a user
      Notes: 
