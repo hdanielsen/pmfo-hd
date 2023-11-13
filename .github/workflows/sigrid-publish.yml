@@ -16,4 +16,3 @@ jobs:
         env:
           SIGRID_CI_TOKEN: "${{ secrets.SIGRID_CI_TOKEN }}"
         run: "./sigridci/sigridci/sigridci.py --customer 'progresstraining' --system 'pmfo-hd' --source . --publish" 
-
