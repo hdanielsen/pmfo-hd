@@ -21,6 +21,38 @@ using Pmfo.Util.ServiceInfo from propath.
 
 class Pmfo.Util.TableUtil: 
     
+    // create a table with fields from another with one unique primary index
+    method public static handle CreateTable(pcPublicname as character, phCopyFields as handle extent,pcIndexFields as character, plCreateBeforeTable as logical):
+        define variable hTable         as handle no-undo.
+        define variable iField         as integer no-undo.
+        define variable cIndexname     as character no-undo.
+        define variable cTableName     as character no-undo.
+        define variable hField         as handle no-undo.
+
+        create temp-table hTable.
+        do iField = 1 to extent(phCopyFields):
+            hTable:add-new-field(phCopyFields[ifield]:name, phCopyFields[iField]:data-type).
+        end.
+        if pcIndexFields > "" then
+        do:
+            cindexname = subst("&1-idx",entry(1,pcIndexFields)).
+            hTable:add-new-index(cindexname,yes,yes). // unique primary 
+            do iField = 1 to num-entries(pcIndexFields):
+                hTable:add-index-field(cindexname,entry(iField,pcIndexFields)).
+            end.     
+        end.
+        cTableName = right-trim(substring(subst("tt&1",BufferUtil:SingularizeSerializeName(pcPublicname, true)),1,32)).
+        hTable:temp-table-prepare(cTableName,plCreateBeforeTable).
+        hTable:serialize-name = pcPublicname.
+        do iField = 1 to extent(phCopyFields):
+            hField = hTable:default-buffer-handle:buffer-field(phCopyFields[iField]:name). 
+            hField:serialize-name = phCopyFields[iField]:serialize-name.
+            if lookup(phCopyFields[iField]:name,pcIndexFields) > 0 then
+               hField:serialize-hidden = true.
+        end.
+        return hTable.    
+    end method. 
+    
     method public static handle CreateTableLike(phBuffer as handle, pcTablename as character):
         define variable hDummyfields as handle extent no-undo.
         define variable cDummy as character no-undo.

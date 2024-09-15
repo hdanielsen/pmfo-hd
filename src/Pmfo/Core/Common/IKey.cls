@@ -17,5 +17,6 @@ interface Pmfo.Core.Common.IKey:
     define public property FieldValues as IFieldValue no-undo extent get.
     method public character ToString(pcOption as character).     
     method public JsonObject ToJson().
+    method public JsonObject NameAndValueToJson().
          
 end interface.

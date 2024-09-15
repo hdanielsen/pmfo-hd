@@ -56,12 +56,16 @@ class Pmfo.Core.Common.NameService implements INameService, ISupportInitialize:
         pcName = lc(substr(pcName,1,1)) + substr(pcName,2).
         return PluralizeName(pcName).  
     end method.
-    
+        
     method public character PublicFieldName(pcName as char):
+        return PublicFieldName("",pcname). 
+    end method.
+    
+    method public character PublicFieldName(pcTableName as character,pcName as char):
         if (pcName > "") = false then 
             undo, throw new IllegalArgumentError("Parameter name cannot be blank or null").
         
-        pcName = NiceFieldName(pcName).
+        pcName = NiceFieldName(pcTableName,pcName).
         pcName = lc(substr(pcName,1,1)) + substr(pcName,2).
         return pcName.  
     end method.
@@ -99,7 +103,8 @@ class Pmfo.Core.Common.NameService implements INameService, ISupportInitialize:
         return pcName. 
     end method. 
     
-    method protected character FixFieldName(pcName as character):
+    // pcTablename is optional -  will have a value from tooling  
+    method protected character FixFieldName(pcTableName as character,pcName as character):
         return pcName. 
     end method. 
     
@@ -153,13 +158,13 @@ class Pmfo.Core.Common.NameService implements INameService, ISupportInitialize:
         end.
     end method.  
     
-    method protected final character NiceFieldName(pcName as char):
+    method protected final character NiceFieldName(pcTableName as character,pcName as char):
         define variable cMappedName as character no-undo.
         cMappedName = PublicNameBE:GetMappedName(SchemaTypeEnum:Field, pcName).
         if cMappedName > "" then
             return cMappedName.
         else do:
-            pcName = FixFieldName(pcName).
+            pcName = FixFieldName(pcTableName,pcName).
             return NiceName(pcName).
         end. 
     end method.   

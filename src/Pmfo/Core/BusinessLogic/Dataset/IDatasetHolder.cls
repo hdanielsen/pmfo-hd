@@ -14,6 +14,7 @@ using Pmfo.Core.BusinessLogic.IGetDataRequest from propath.
 using Pmfo.Core.Service.IClientGetRequest from propath.
 using Pmfo.Core.BusinessLogic.IBusinessEntity from propath.
 using Pmfo.Core.BusinessLogic.IRelationDefinition from propath.
+using Pmfo.Core.Service.IClientUpdateRequest from propath.
 
 interface Pmfo.Core.BusinessLogic.Dataset.IDatasetHolder:  
      // the main public dataset - should be backed by relation definitions for correct one-to one and many-to one serialization  
@@ -26,8 +27,11 @@ interface Pmfo.Core.BusinessLogic.Dataset.IDatasetHolder:
      // is not used  
       
      method public void AddLinksAndSelects(pBe as IBusinessEntity,pClientRequest as IClientGetRequest).
-     
-     method public IRelationDefinition GetClientLink(pcParentName as character, pcPublicName as character):
+     method public void AddUpdateResponseRelations(pClientRequest as IClientUpdateRequest).
+     method public void setVisibleChildren(phDataset as handle,
+                                          pcPath as character, 
+                                          pPublicPropnames as character).
+    // method public IRelationDefinition GetClientLink(pcParentName as character, pcPublicName as character):
            
      // allow deep copy (only for resue of main defs - if you need both keep the class alivee)
      method public void GetDataset(output dataset-handle phDataset).

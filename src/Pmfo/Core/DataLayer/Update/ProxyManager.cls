@@ -108,15 +108,24 @@ class Pmfo.Core.DataLayer.Update.ProxyManager implements IFieldManager:
         end.    
     end method.          
     
+    method public character WhereExpression(phDbBuffer as handle, pcSourcename as character):
+        return InternalWhereExpression(phDBBuffer,pcSourcename, false).
+    end method. 
+    
+    method public character BeforeWhereExpression(phDbBuffer as handle, pcSourcename as character):
+        return InternalWhereExpression(phDBBuffer,pcSourcename, true).
+    end method. 
+    
     // build where expression for a source key. there may be many fields for the same key
     // Progress databases are not famous for good normalization and key may be overloaded 
     // to conactinate stuff for unqieness acrosss otehr fields or stuff...
-    method public character WhereExpression(phDbBuffer as handle, pcSourcename as character):
+    method public character InternalWhereExpression(phDbBuffer as handle, pcSourcename as character, plBeforeBuffer as logical):
         define variable oIterator   as IIterator   no-undo.
         define variable oFieldProxy as IFieldProxy no-undo. 
         define variable cWhere      as character no-undo.
-        define variable cAnd         as character no-undo.
+        define variable cAnd        as character no-undo.
         define variable cExpression as character no-undo.
+        define variable hField      as handle no-undo.
         if ProxyFields:Size > 0 then 
         do:
             oIterator = ProxyFields:Iterator().
@@ -127,15 +136,15 @@ class Pmfo.Core.DataLayer.Update.ProxyManager implements IFieldManager:
                 and oFieldProxy:SourceName       = pcSourcename then 
                 do: 
                     assign
-                        cExpression = oFieldProxy:ColumnExpression(new QueryPredicate(pcSourcename,QueryOperatorEnum:Eq,oFieldProxy:field:buffer-value)):ToString(). 
+                        hField = if plBeforeBuffer then oFieldProxy:BeforeField else oFieldProxy:field.
+                        cExpression = oFieldProxy:ColumnExpression(new QueryPredicate(pcSourcename,QueryOperatorEnum:Eq,hField:buffer-value)):ToString(). 
                         cWhere = cWhere 
                                + (if cWhere = "" then "" else " and ")
                                + cExpression. 
-                    
+                   
                 end.     
             end.    
-        end.    
-        
+        end.   
         return cWhere. 
     end method.  
     
@@ -214,7 +223,12 @@ class Pmfo.Core.DataLayer.Update.ProxyManager implements IFieldManager:
     method public void AfterRow(input pcBufferNames as character, input phBufferHandles as handle extent):
         define variable oIterator   as IIterator   no-undo.
         define variable oFieldProxy as IFieldProxy no-undo.
-        
+        define variable i as integer no-undo.
+        define variable cc as character no-undo.
+        do i = 1 to extent(phBufferhandles):
+               cc= cc + "," + phbufferhandles[i]:name.  
+        end.      
+       
         if ProxyFields:Size > 0 then 
         do:
             oIterator = ProxyFields:Iterator().
@@ -279,15 +293,17 @@ class Pmfo.Core.DataLayer.Update.ProxyManager implements IFieldManager:
                 if pUpdateTarget:BufferHandle:avail = false then   
                     undo, throw new IllegalStateError(subst("SaveRow called for create with database table &1 unavailable in ProxyManager",pUpdateTarget:BufferHandle:name)).
             end.
-            else // TODO fix/ensure  DataSource:SaveRow always makes/has this avialable also       
-                pUpdateTarget:FindSource(exclusive-lock).
+            else // TODO fix/ensure  DataSource:SaveRow always makes/has this avialable also
+            do: 
+                pUpdateTarget:FindSource(phBeforeBuffer,exclusive-lock).
+            end.
             oIterator = ProxyFields:Iterator().
             // the list is typcially small so the assumption is that a collection loop is cheaper than a map  
             do while(oIterator:HasNext()):
                 ofieldProxy = cast(oIterator:Next(),IfieldProxy).
                 if phBeforebuffer:row-state = row-created or oFieldProxy:Field:buffer-value <> oFieldProxy:BeforeField:buffer-value then 
                     oFieldProxy:Save().  
-            end.    
+            end.   
         end.    
         return true.
     end method.     

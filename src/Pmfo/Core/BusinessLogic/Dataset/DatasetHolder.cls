@@ -32,8 +32,9 @@ using Pmfo.Core.BusinessLogic.RelationDefinition from propath.
 using OpenEdge.Core.Collections.IIterator from propath.
 using Pmfo.Core.Error.IllegalArgumentError from propath.
 using Pmfo.Core.BusinessLogic.IRelationDefinition from propath.
+using Pmfo.Core.Service.IClientUpdateRequest from propath.
 
-class Pmfo.Core.BusinessLogic.Dataset.DatasetHolder implements IDatasetHolder: 
+class Pmfo.Core.BusinessLogic.Dataset.DatasetHolder abstract implements IDatasetHolder: 
     
     define public    property Dataset         as handle no-undo get. protected set.
     define protected property Links           as ICollection no-undo get. set.
@@ -48,7 +49,24 @@ class Pmfo.Core.BusinessLogic.Dataset.DatasetHolder implements IDatasetHolder:
         this-object:Dataset = phClientDataset.
     end constructor.
     
-    
+    method public void setVisibleChildren(phDataset as handle,
+                                          pcPath as character, 
+                                          pPublicPropnames as character):
+        define variable hBuffer as handle no-undo.
+        define variable i as integer no-undo.
+        define variable iFLd as integer no-undo.
+        hBuffer = DatasetUtil:GetBufferByPathName(phDataset, pcPath).  
+        do i = 1 to hBuffer:num-child-relations:
+            if lookup(hBuffer:get-child-relation (i):child-buffer:serialize-name,"metric,imperial") > 0 then  
+            do iFLd = 1 to hBuffer:get-child-relation (i):child-buffer:num-fields: 
+                if lookup(hBuffer:get-child-relation (i):child-buffer:buffer-field(iFLd):serialize-name,pPublicPropnames) = 0 then
+                    hBuffer:get-child-relation (i):child-buffer:buffer-field(iFLd):serialize-hidden = true. 
+            end.        
+        
+        end.                 
+    end.    
+    method public abstract void AddUpdateResponseRelations(pClientRequest as IClientUpdateRequest).
+ 
     // TODO.. ideally the relation added for missing expadns could be done later when the BEs have 
     // been started are started in DatasetGetManager, but the LinRouter that adds these for Expand 
     // suffers from the same problem -
@@ -122,7 +140,7 @@ class Pmfo.Core.BusinessLogic.Dataset.DatasetHolder implements IDatasetHolder:
         Links:Add(new RelationDefinition(pcParent,pcPublicChild,pRelationType)).      
     end method.    
     
-    method public IRelationDefinition GetClientLink(pcParentName as character, pcPublicName as character):
+    method protected IRelationDefinition GetClientLink(pcParentName as character, pcPublicName as character):
         define variable oIterator as IIterator no-undo.
         define variable oRel      as IRelationDefinition no-undo.
         if valid-object(Links) then

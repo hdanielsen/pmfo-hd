@@ -44,8 +44,12 @@ class Pmfo.Core.DataLayer.AbstractFieldProxy abstract implements IFieldProxy:
     define protected property SourceExtent       as integer no-undo get. set.  
     
     constructor protected AbstractFieldProxy (pcFieldName as character,pcSourceName as character):
+         Assert:NotEmpty(pcFieldName,"Field Name").
+         Assert:NotEmpty(pcSourceName,"Source Field Name").
+         
          Name       = pcFieldName.
          SourceName = pcSourceName.
+         
     end constructor.
     
     constructor protected AbstractFieldProxy (pcFieldName as character,pcSourceName as character, plReadOnly as logical):
@@ -72,12 +76,32 @@ class Pmfo.Core.DataLayer.AbstractFieldProxy abstract implements IFieldProxy:
     method protected void AssertSourceField(phField as handle):
     end method.    
     
-    // allow subclasses to override to track othjere fields   
+    // allow subclasses to override to track other tt fields   
     method protected void Preparebuffer(phDataBuffer as handle):
     end method.
     
-    // final - this is set in stone (admittedly optimistic assumption - change if really required 
-    // but AssertField AssertSourceField and Preparebuffer should allo subclasses to control behavior 
+    // allow subclasses to override to track other db fields   
+    method protected void PrepareDatabaseBuffer(phDbBuffer as handle):
+    end method.
+    
+    // did not need this ... 
+/*    method public void ResetSourceName(pcname as character) :                            */
+/*        SourceBufferName = pcname.                                                       */
+/*        if SourceExtent > 0 then                                                         */
+/*            SourceFullName = subst("&1.&2[&3]",SourceBufferName,SourceName,SourceExtent).*/
+/*        else                                                                             */
+/*            SourceFullName = subst("&1.&2",SourceBufferName,SourceName).                 */
+/*        /* This reference will likely not exist, but is to be returned from              */
+/*           ColumnSource to be added to the QueryPredicate and QuerySortEntry             */
+/*           and ColumnExpression and ColumnSort will then use this fieldname              */
+/*           to generate/return the final DB expression/predicate      */                  */
+/*                                                                                         */
+/*        ColumnSourceName = subst("&1.&2",SourceBufferName,Name).                         */
+/*    end.                                                                                 */
+    
+    // final - this is set in stone. Admittedly optimistic assumption change of required 
+    // but AssertField, AssertSourceField, Preparebuffer and PrepareDatabaseBuffer 
+    // should allow subclasses to control behavior  
     method public final logical Prepare(phDataBuffer as handle, phDatabaseBuffer as handle):
         
         if this-object:Name = ?
@@ -139,7 +163,7 @@ class Pmfo.Core.DataLayer.AbstractFieldProxy abstract implements IFieldProxy:
         ColumnSourceName = subst("&1.&2",SourceBufferName,Name).
         
         Preparebuffer(phDataBuffer).
-        
+        PrepareDatabaseBuffer(phDatabaseBuffer).
         Prepared = true.
         return true.
     end method.    

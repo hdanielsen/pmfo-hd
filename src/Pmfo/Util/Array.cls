@@ -41,6 +41,7 @@ class Pmfo.Util.Array:
     
     {Pmfo/Util/mergeArrayMethod.i character}
     {Pmfo/Util/mergeArrayMethod.i date}
+    {Pmfo/Util/mergeArrayMethod.i datetime}
     {Pmfo/Util/mergeArrayMethod.i decimal}
     {Pmfo/Util/mergeArrayMethod.i handle}
     {Pmfo/Util/mergeArrayMethod.i integer}
@@ -50,13 +51,19 @@ class Pmfo.Util.Array:
     
     {Pmfo/Util/findArrayMethod.i character}
     {Pmfo/Util/findArrayMethod.i date}
+    {Pmfo/Util/findArrayMethod.i datetime}
+    {Pmfo/Util/findArrayMethod.i datetime-tz}
     {Pmfo/Util/findArrayMethod.i decimal}
     {Pmfo/Util/findArrayMethod.i handle}
     {Pmfo/Util/findArrayMethod.i integer}
     {Pmfo/Util/findArrayMethod.i int64}
     {Pmfo/Util/findArrayMethod.i logical}
     
-    // just implement this without the findArrayMethod include to use Equals - it is obviously possible to do this based on
+   //  assumed to be not needed - use  StringUtil:CompareClobValues 
+   //  method public static integer Find (pValue as longchar, pArray as longchar extent):
+   //
+      
+    // just implement this without the findArrayMethod include to use Equals - it is possible to do this based on
     // preprocessor parameters but this seems clearer 
     method public static integer Find (pValue as Progress.Lang.Object, pArray as Progress.Lang.Object extent):
         define variable i       as integer no-undo.
@@ -69,11 +76,14 @@ class Pmfo.Util.Array:
     
     {Pmfo/Util/compareArraysMethod.i character}
     {Pmfo/Util/compareArraysMethod.i date}
+    {Pmfo/Util/compareArraysMethod.i datetime}
+    {Pmfo/Util/compareArraysMethod.i datetime-tz}
     {Pmfo/Util/compareArraysMethod.i decimal}
     {Pmfo/Util/compareArraysMethod.i handle}
     {Pmfo/Util/compareArraysMethod.i integer}
     {Pmfo/Util/compareArraysMethod.i int64}
     {Pmfo/Util/compareArraysMethod.i logical}
+   // {Pmfo/Util/compareArraysMethod.i longchar}  needs find which is a bit complicated with code page  
     {Pmfo/Util/compareArraysMethod.i Progress.Lang.Object} // use full name as organize using does not see this
     
     {Pmfo/Util/toStringArrayMethod.i date}
@@ -86,6 +96,18 @@ class Pmfo.Util.Array:
     {Pmfo/Util/toStringArrayMethod.i logical}
     {Pmfo/Util/toStringArrayMethod.i longchar}
     {Pmfo/Util/toStringArrayMethod.i Progress.Lang.Object}
+    
+    {Pmfo/Util/trimArrayMethod.i character}
+    {Pmfo/Util/trimArrayMethod.i date}
+    {Pmfo/Util/trimArrayMethod.i datetime}
+    {Pmfo/Util/trimArrayMethod.i datetime-tz}
+    {Pmfo/Util/trimArrayMethod.i decimal}
+    {Pmfo/Util/trimArrayMethod.i handle}
+    {Pmfo/Util/trimArrayMethod.i integer}
+    {Pmfo/Util/trimArrayMethod.i int64}
+    {Pmfo/Util/trimArrayMethod.i logical}
+//    {Pmfo/Util/trimArrayMethod.i longchar} - needs find which is a bit complicated with code page 
+    {Pmfo/Util/trimArrayMethod.i Progress.Lang.Object}
      
     {Pmfo/Util/substituteArrayMethod.i date}
     {Pmfo/Util/substituteArrayMethod.i datetime}

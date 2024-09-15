@@ -17,5 +17,6 @@ using Progress.Lang.*.
 using Pmfo.Core.DataLayer.ISourceField.
 
 interface Pmfo.Core.DataLayer.IHiddenSourceKey inherits ISourceField:  
-  
+    method public logical Prepare(phDbfield as handle).
+     
 end interface.

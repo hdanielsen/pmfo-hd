@@ -210,21 +210,29 @@ class Pmfo.Util.QueryUtil:
         define variable oGetTableRequest as GetDataTableRequest no-undo.
         oGetTableRequest = new GetDataTableRequest(pcTable).
         oGetTableRequest:QueryDefinition = new QueryDefinition(GetQueryPredicate(pExpression)).
-        return new GetDataRequest(cast(Array:ToArray(oGetTableRequest),IGetDataTableRequest)).
+        return new GetDataRequest(oGetTableRequest).
     end method.
     
     method public static IGetDataRequest GetDataRequest(pcTable as char,pcField as char, poOperator as QueryOperatorEnum, piValue as integer) :
         return GetDataRequest(pcTable,pcField,poOperator,string(piValue)).
     end method.
     
-    
     method public static IGetDataRequest GetDataRequest(pcTable as char,pcField as char, poOperator as QueryOperatorEnum, pcValue as char) :
         define variable oGetRequest as IGetDataRequest no-undo.
         define variable oGetTableRequest as GetDataTableRequest no-undo.
         oGetTableRequest = new GetDataTableRequest(pcTable).
-        oGetTableRequest:QueryDefinition = new QueryDefinition(new QueryPredicate(pcField,poOperator,pcValue)).
-        return new GetDataRequest(cast(Array:ToArray(oGetTableRequest),IGetDataTableRequest)).
+        oGetTableRequest:AddQueryEntry(new QueryPredicate(pcField,poOperator,pcValue)).
+        return new GetDataRequest(oGetTableRequest).
     end method.
+    
+    method public static IGetDataRequest GetDataRequest(pcTable as char,pQuery as IQueryEntry) :
+        define variable oGetRequest as IGetDataRequest no-undo.
+        define variable oGetTableRequest as GetDataTableRequest no-undo.
+        oGetTableRequest = new GetDataTableRequest(pcTable).
+        oGetTableRequest:AddQueryEntry(pQuery).
+        return new GetDataRequest(oGetTableRequest).
+    end method.
+    
     
     method public static IGetDataRequest GetDataRequest(pcTable as char) :
         define variable oGetRequest as IGetDataRequest no-undo.

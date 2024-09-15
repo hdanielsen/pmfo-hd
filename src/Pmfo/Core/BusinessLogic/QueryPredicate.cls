@@ -82,6 +82,15 @@ class Pmfo.Core.BusinessLogic.QueryPredicate inherits AbstractQueryPredicate imp
     end constructor.
     */
    
+    constructor protected QueryPredicate (input pFieldName as character,
+                                          input pcValue    as character ):
+        
+        super(pFieldName).
+        assign StringValue = pcValue.
+         
+    end constructor.
+   
+   
     /* @param character field name 
        @param QueryOperatorEnum operator 
        @param character value */
@@ -348,8 +357,12 @@ class Pmfo.Core.BusinessLogic.QueryPredicate inherits AbstractQueryPredicate imp
     constructor public QueryPredicate (input pFieldName as character,
                                        input pOperator  as QueryOperatorEnum,
                                        input pValues    as character extent):
-         super(pFieldName,pOperator).
+                                           
+        super(pFieldName,pOperator).
         
+        if extent(pValues) = ? then 
+           undo, throw new IllegalArgumentError('Cannot pass an empty array as values').
+           
         if pOperator = QueryOperatorEnum:InRange and extent(pValues) <> 2 then
             undo, throw new IllegalArgumentError('The values must have exactly 2 extents for the InRange operator').
                                                   
@@ -501,8 +514,13 @@ class Pmfo.Core.BusinessLogic.QueryPredicate inherits AbstractQueryPredicate imp
                             + subst('&1 &2 &3',
                                     if plUsePublicLabel then cSerializeName else FieldName,
                                     if valid-handle(phBuffer) then QueryUtil:GetOperatorText("eq") else "eq",
-                                    if luseQuoter then quoter(StringValues[i]) else StringValues[i]).            
+                                    if plUsePublicLabel and StringValues[i] = ? 
+                                    then "null" 
+                                    else if luseQuoter 
+                                         then quoter(StringValues[i]) 
+                                         else StringValues[i]).            
             end.
+            // thus is an OR so add parenthesis unless suppressed
             if plTrimParenthesis = false then
                 cExpression = subst("(&1)",cExpression).
         end.    
@@ -513,16 +531,26 @@ class Pmfo.Core.BusinessLogic.QueryPredicate inherits AbstractQueryPredicate imp
                         + subst('&1 &2 &3',
                                 if plUsePublicLabel then cSerializeName else FieldName,
                                 if valid-handle(phBuffer) then QueryUtil:GetOperatorText(if i = 1 then "ge" else "le") else if i = 1 then "ge" else "le",
-                                if luseQuoter then quoter(StringValues[i]) else StringValues[i]).            
+                                if plUsePublicLabel and StringValues[i] = ? 
+                                then "null" 
+                                else if luseQuoter 
+                                     then quoter(StringValues[i]) 
+                                     else StringValues[i]). 
         end.
         else do:
             cExpression = subst('&1 &2 &3',
                                 if plUsePublicLabel then cSerializeName else FieldName,
                                 if valid-handle(phBuffer) then QueryUtil:GetOperatorText(Operator:ToString()) else lc(Operator:ToString()),
-                                if luseQuoter then quoter(StringValue) else StringValue).
+                                if plUsePublicLabel and StringValue = ?
+                                then "null"  
+                                else if luseQuoter 
+                                     then quoter(StringValue) 
+                                     else StringValue).
         end.
         return cExpression. 
         
     end.
+    
+    
     
 end class.

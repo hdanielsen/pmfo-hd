@@ -16,6 +16,7 @@ using OpenEdge.Core.Assert from propath.
 using Pmfo.Core.Error.ApplicationError from propath.
 using Pmfo.Core.Error.IllegalArgumentError from propath.
 using Pmfo.Util.BufferUtil from propath.
+using Pmfo.Core.Error.BadRequestError from propath.
 
 block-level on error undo, throw.
 
@@ -38,6 +39,7 @@ class Pmfo.Util.ErrorStringUtil:
     
     method private static void AddBufferError(phBuffer as handle, pcType as character, pcMessage as character, piNumber as integer, pcField as char):
         define variable cFieldSerializeName as character no-undo.
+        define variable cValue as character no-undo.
         if pcMessage = "" or pcMessage = ? then
              undo, throw new IllegalArgumentError(subst("Error in error handling - &1 cannot be null or blank",if pcType <> "message" then subst("&1 message",pcType) else pcType)).
         
@@ -48,7 +50,28 @@ class Pmfo.Util.ErrorStringUtil:
                 undo, throw new ApplicationError(subst("Error in error handling - &1",e:GetStrippedMessage()),e).    
             end catch.
         end.
-     
+        if phBuffer:row-state = 0 then
+        do: 
+            // hack 
+            if pctype = "question" then 
+            do:
+                if not valid-object(phBuffer:table-handle:before-table) then 
+                    undo, throw new ApplicationError(subst("Error in error handling - Cannot Ask Question for erad only table &1",phBuffer:name)).    
+                
+                // hack row modified without really chaning anything  
+                phBuffer:table-handle:tracking-changes = true.
+                cValue = phBuffer:buffer-field(1):buffer-value.
+                phBuffer:buffer-field(1):buffer-value = ?. 
+                phBuffer:buffer-field(1):buffer-value = cValue. 
+                
+                phBuffer:table-handle:tracking-changes = false.
+                
+            end.
+            else 
+                undo, throw new BadRequestError(pcMessage,piNumber).
+                
+        end.
+        
         assign
             phBuffer:error         = true
             phBuffer:dataset:error = true when valid-handle(phBuffer:dataset) // not avail in cases when table passed by-reference

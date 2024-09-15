@@ -29,10 +29,15 @@ using Pmfo.Util.JsonReader from propath.
 using Pmfo.Util.JsonUtil from propath.
 using Pmfo.Util.StringUtil from propath.
 using Progress.Json.ObjectModel.JsonObject from propath.
+using OpenEdge.Core.Assert from propath.
 
 class Pmfo.Core.Common.JsonLookupTableReadHandler implements IJsonExtendedReadHandler: 
     
+    // uses only one of these
     define protected property MainEntities as character no-undo get. set.
+    define protected property LookupEntities as character no-undo get. set.
+    define protected property NullList as character no-undo get. set.
+    
     // the BE action method should push this to ClientUpdateRequest:Relations (may be improved and/or moved)  
     define public property Links as  ICollection no-undo 
         get():
@@ -48,16 +53,32 @@ class Pmfo.Core.Common.JsonLookupTableReadHandler implements IJsonExtendedReadHa
     ------------------------------------------------------------------------------*/
 
     constructor public JsonLookupTableReadHandler (pcEntities as character  ):
-        super ().
-        MainEntities = pcEntities.
+        this-object(pcEntities,false).
     end constructor.
 
+    constructor public JsonLookupTableReadHandler (pcEntities as character, plAreLookups as logical ):
+        define variable i as integer no-undo.
+        super ().
+        Assert:NotEmpty(pcEntities,"Entities").
+      //  Assert:NotNull(plAreLookups,"AreLookups").
+        
+        if plAreLookups = false then      
+            MainEntities = pcEntities.
+        else 
+            LookupEntities = pcEntities.
+    end constructor.
+    
     method public logical CheckReadOnlyAndPrepareBuffer( input phBuffer as handle, input pState as RowStateEnum ):
-        if lookup(phBuffer:serialize-name,MainEntities) = 0 then 
-            return true.
-        return false.
+        return IsLookupEntity(phBuffer).
     end method.
     
+    method protected logical IsLookupEntity(phBuffer as handle):
+        if MainEntities > "" then
+            return lookup(phBuffer:serialize-name,MainEntities) = 0.  
+        else
+            return lookup(phBuffer:serialize-name,LookupEntities) > 0.  
+        
+    end method.    
     // called with buffer released and not avail 
     //  
     // return true to signal that the JsonReader should skip this row 
@@ -68,10 +89,12 @@ class Pmfo.Core.Common.JsonLookupTableReadHandler implements IJsonExtendedReadHa
         define variable i as integer no-undo.
         define variable oRel as IRelationDefinition  no-undo.
         define variable cPropNames  as character   no-undo.
-        define variable cNulllist   as character no-undo.
-        define variable hFld as handle no-undo.       
-        if lookup(phBuffer:serialize-name,MainEntities) = 0 then
+        define variable hFld as handle no-undo.     
+        define variable cQualName  as character no-undo.  
+        
+        if IsLookupEntity(phBuffer) then
         do:
+            
             if valid-handle(phBuffer:parent-relation) then 
             do: 
                 // no json means null object for no record
@@ -79,44 +102,43 @@ class Pmfo.Core.Common.JsonLookupTableReadHandler implements IJsonExtendedReadHa
                 do:
                     phbuffer:find-unique (subst("where &1",BufferUtil:GetJoinExpression(phBuffer:parent-relation))) no-error.
                     cChildFields  = BufferUtil:GetChildJoinFields(phBuffer:parent-relation).
-                    if not phBuffer:avail then 
+                    if not phBuffer:avail then
                     do:
                         phbuffer:buffer-create.
                         cParentFields = BufferUtil:GetParentJoinFields(phBuffer:parent-relation).
-                       
-                        do i = 1 to num-entries(cParentFields): 
-                            phBuffer:buffer-field(entry(i,cChildfields)):buffer-value 
+
+                        do i = 1 to num-entries(cParentFields):
+                            phBuffer:buffer-field(entry(i,cChildfields)):buffer-value
                                   = phBuffer:parent-relation:parent-buffer:buffer-field(entry(i,cParentFields)):buffer-value.
-                        end.    
+                        end.
                     end.
                     
                 end.
-                oRel = new RelationDefinition(phBuffer:parent-relation:parent-buffer:serialize-name,phbuffer:serialize-name). 
+                oRel = new RelationDefinition(phBuffer:parent-relation:parent-buffer:serialize-name,phbuffer:serialize-name,RelationTypeEnum:ManyToOne). 
+                // for nullist
+                cQualname = subst("&1.&2",phBuffer:parent-relation:parent-buffer:name,phbuffer:name).
                 
                 if not Links:Contains(oRel) then
                 do:
                     Links:Add(oRel).
-                    oRel:Cardinality = RelationTypeEnum:ManyToOne. 
                     // if object hide fields not in data
                     if valid-object(pJson) then 
                         HideFields(pJson,phbuffer).
                     else // else keep track to check if any other of the relation has data
-                        cNullList = StringUtil:AppendEntry(cNulllist, phBuffer:name).     
+                        NullList = StringUtil:AppendEntry(Nulllist,cQualname).     
                 end.
                 // if we got an object that previously was added to nullist hide fields not in data
-                else if valid-object(pJson) and lookup(phBuffer:name,cNulllist) > 0 then 
+                else if valid-object(pJson) and lookup(cQualname,Nulllist) > 0 then 
                 do:
                     HideFields(pJson,phbuffer).
-                    cNullList = StringUtil:RemoveEntryFromList(phBuffer:name,cNulllist).
+                    NullList = StringUtil:RemoveEntryFromList(cQualname,Nulllist).
                 end.
                 if valid-object(pJson) then
                 do i = 1 to phbuffer:num-fields: 
                     hFld = phBuffer:buffer-field(i).
                     if lookup(Hfld:serialize-name,cChildfields) = 0 
                     and pJson:has(Hfld:serialize-name) then
-                    do: 
                         pReader:AssignField(pjson, hfld).
-                    end.   
                 end.        
                     
             end.       

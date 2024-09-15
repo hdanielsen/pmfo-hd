@@ -15,30 +15,12 @@ using OpenEdge.Core.Collections.ISet from propath.
 using OpenEdge.Core.Collections.Set from propath.
 using Pmfo.Tools.Gui.Model.AppBuilderModel from propath.
 using Pmfo.Tools.Gui.Model.FieldModel from propath.
+using Pmfo.Tools.Gui.Model.AbstractSdoModel from propath.
  
 
 block-level on error undo, throw.
 
-class Pmfo.Tools.Gui.Model.SdoModel inherits AppBuilderModel  : 
-    define private temp-table ttBuffer no-undo 
-       field name as char
-       field db  as char
-       field tableName as char
-       index name as primary unique name.
-    
-    define override public property ProcedureType as char no-undo init "SmartDataObject" get. 
-    define public property DataLogicProcedure as character no-undo get. protected set.
-    define public property DataBase as character no-undo get. protected set.
-//    define property Table as character no-undo get. protected set.
-    
-    define public property QueryName     as character no-undo get. protected set.
-    define public property BaseQuery     as character no-undo get. protected set.
-    define public property AssignList    as character no-undo get. protected set.
-    define public property DataFields    as character no-undo get. protected set.
-    define public property EnabledFields as character no-undo get. protected set.
-    define public property Fields        as ISet      no-undo get. protected set.      
-    define protected property ReadSettings as logical no-undo get. set.     
-    
+class Pmfo.Tools.Gui.Model.SdoModel inherits AbstractSdoModel  : 
     constructor public SdoModel (  ):
         super().
     end constructor.
@@ -51,23 +33,6 @@ class Pmfo.Tools.Gui.Model.SdoModel inherits AppBuilderModel  :
             if not lok then 
                 DataLogicProcedure = ?.
         end.    
-    end method.    
-    
-    method public char extent GetBuffers():
-        define variable cBuffers  as character extent no-undo.
-        define variable iCnt as integer no-undo.
-        for each ttbuffer:
-            icnt = icnt + 1.
-        end.
-        if iCnt > 0 then do:
-            extent(cBuffers) = icnt.
-            iCnt = 0.
-            for each ttbuffer:
-                icnt = icnt + 1.
-                cBuffers[icnt] = subst("define buffer &1 for &2.",ttBuffer.name,ttbuffer.tablename).
-            end.
-        end.
-        return cBuffers.     
     end method.    
     
     method override protected void CheckCodeLine(pcSection as char,pcline as char):
@@ -111,11 +76,6 @@ class Pmfo.Tools.Gui.Model.SdoModel inherits AppBuilderModel  :
         end.
     end.    
     
-    // return the assignlist converted for BE 
-    method public character GetAssignListNoRowObject():
-        return left-trim(replace("," + AssignList,",RowObject.",","),",").  
-    end.     
-    
     method protected void CheckAndAssignDlp(pcline as char):
         if pcLine matches "&glob* DATA-LOGIC-PROCEDURE *" then 
         do:
@@ -123,6 +83,14 @@ class Pmfo.Tools.Gui.Model.SdoModel inherits AppBuilderModel  :
             DataLogicProcedure = GetFullDlpName(entry(num-entries(pcLine," "),pcLine," ")).
         end. 
     end.    
+    
+      
+    // return the assignlist converted for BE 
+    method public character GetAssignListNoRowObject():
+        return left-trim(replace("," + AssignList,",RowObject.",","),",").  
+    end.     
+    
+   
     
     method override protected logical ReadLine( pcLine as char ):
         define variable lOk    as logical no-undo.
@@ -187,28 +155,6 @@ class Pmfo.Tools.Gui.Model.SdoModel inherits AppBuilderModel  :
         return lok.
     end method.
     
-    
-    /* The current assumption is that th DLP is in the same directory.
-       This allows this to work when the sdo is not in propath 
-       TODO: Consider changing this to require propath and use search 
-            
-    */ 
-    method protected character GetFullDlpName(pdlpName as char):
-        define variable i as integer no-undo.
-        define variable istart as integer no-undo.
-        define variable cin as character no-undo.
-        cin = pdlpname.
-        if pdlpname = ".p" then 
-            return "".
-        pdlpname = replace(pdlpname,"/","~\").
-        iStart = num-entries(Name,"~\") - num-entries(pdlpName,"~\") .
-        do i = iStart to 1 by -1:
-             pdlpname = entry(i,Name,"~\") + "~\" + pdlpname.
-        end.
-      
-        return pdlpname.
-    end method.    
-    
     method protected ISet LoadFields ():
         define variable cFieldName as character no-undo.
         define variable cDbField   as character no-undo.
@@ -252,6 +198,7 @@ class Pmfo.Tools.Gui.Model.SdoModel inherits AppBuilderModel  :
                         oField:sourceDb    = entry(1,cLine[3],".")
                         oField:sourceTable = entry(2,cLine[3],".")
                         oField:sourceName  = entry(3,cLine[3],".")
+                        oField:isJoin      = oField:sourceTable <> this-object:Table
                        .
                     if oField:sourceTable = this-object:Table and this-object:Database = "" then
                         this-object:Database = oField:SourceDb.
@@ -294,5 +241,28 @@ class Pmfo.Tools.Gui.Model.SdoModel inherits AppBuilderModel  :
 /*        end.                                                     */
         return oFields.
     end method.     
+    
+    /* The current assumption is that th DLP is in the same directory.
+       This allows this to work when the sdo is not in propath 
+       TODO: Consider changing this to require propath and use search 
+            
+    */ 
+  
+    method protected character GetFullDlpName(pdlpName as char):
+        define variable i as integer no-undo.
+        define variable istart as integer no-undo.
+        define variable cin as character no-undo.
+        cin = pdlpname.
+        if pdlpname = ".p" then 
+            return "".
+        pdlpname = replace(pdlpname,"/","~\").
+        iStart = num-entries(Name,"~\") - num-entries(pdlpName,"~\") .
+        do i = iStart to 1 by -1:
+            pdlpname = entry(i,Name,"~\") + "~\" + pdlpname.
+        end.
+      
+        return pdlpname.
+    end method.    
+   
     
 end class.

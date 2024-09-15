@@ -13,6 +13,8 @@
 using Progress.Lang.*.
 using Pmfo.Core.Service.IClientRequest from propath.
 using Pmfo.Core.BusinessLogic.RowStateEnum from propath.
+using Pmfo.Core.Common.IFunction from propath.
+using Pmfo.Core.BusinessLogic.IAction from propath.
 
 interface Pmfo.Core.BusinessLogic.IDynamicChild:
     // load a single action or function depending on the type of the client request in a case where this is a true child
@@ -22,5 +24,12 @@ interface Pmfo.Core.BusinessLogic.IDynamicChild:
     // cases where the dynamic child is not a child so it would most likely be called from 
     // the class' own GetRequestDataset and thus does not need to be public) 
     method public void LoadMethod(pClientRequest as IClientRequest,pcParentName as character).
+    
+    // for OpenAPi
+    method public IFunction extent GetFunctionsForEntity (pcEntity  as character).
+    
+    // for OpenAPi
+    method public IAction extent GetActionsForEntity (pcEntity  as character):
+   
     
 end interface.

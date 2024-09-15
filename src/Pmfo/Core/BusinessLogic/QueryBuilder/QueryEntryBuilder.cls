@@ -27,6 +27,7 @@ using Pmfo.Core.BusinessLogic.CompareQueryPredicate from propath.
 using Ccs.BusinessLogic.JoinEnum from propath.
 using Pmfo.Core.BusinessLogic.QueryBuilder.QueryEntryBuilder from propath.
 using Pmfo.Core.BusinessLogic.QueryEntry from propath.
+using Pmfo.Core.BusinessLogic.ModuloQueryPredicate from propath.
 
 block-level on error undo, throw.
 
@@ -104,6 +105,7 @@ class Pmfo.Core.BusinessLogic.QueryBuilder.QueryEntryBuilder inherits QueryWalke
         define variable cValueList    as character no-undo.
         define variable i             as integer no-undo.
         define variable oNewEntry     as IQueryEntry no-undo.
+        
         if valid-object(ColumnMap) then
             cDbField = ColumnMap:Get(pPredicate:FieldName).
         else 
@@ -123,6 +125,17 @@ class Pmfo.Core.BusinessLogic.QueryBuilder.QueryEntryBuilder inherits QueryWalke
             cast(oNewPredicate,CompareQueryPredicate):Strength = cast(pPredicate,CompareQueryPredicate):Strength.
                 
         end.
+        else if type-of(pPredicate,ModuloQueryPredicate) then 
+        do:
+            oPredicate = cast(pPredicate,QueryPredicate).
+            oNewPredicate = new ModuloQueryPredicate(
+                               cDbField,
+                               cast(oPredicate,ModuloQueryPredicate):ModuloBase,
+                               cast(oPredicate,ModuloQueryPredicate):ModuloOperator,
+                               integer(oPredicate:StringValue)).
+                 
+        end.
+        
         else if type-of(pPredicate,QueryPredicate) then 
         do:
             oPredicate = cast(pPredicate,QueryPredicate).

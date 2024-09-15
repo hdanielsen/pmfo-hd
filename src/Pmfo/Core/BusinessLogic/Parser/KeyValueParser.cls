@@ -35,20 +35,21 @@ using Pmfo.Util.ServiceInfo from propath.
 
 class Pmfo.Core.BusinessLogic.Parser.KeyValueParser: 
     
-    // This variation supports a single key value - the last parameter specifies if parent join fields can be ignored so that a single key can 
-    // be derrived for a multi-key buffer when the leading fields are in the join        
-    method public IQueryEntry GetKeyEntry (pcString as character,phBuffer as handle,plHasPublicNames as logical, plUsechildKeys as logical) :
-        
-        pcString = ServiceInfo:ConvertSingleKeyToExpression(phbuffer, pcString, plHasPublicNames, plUsechildKeys).
-        
-        return GetKeyEntry (pcString,phBuffer,plHasPublicNames).
+    method public IQueryEntry GetKeyEntry (pcString as character,phBuffer as handle,plHasPublicNames as logical) :
+        return GetKeyEntry (pcString,phBuffer,plHasPublicNames,false).
     end.
     
-    method public IQueryEntry GetKeyEntry (pcString as character,phBuffer as handle,plHasPublicNames as logical) :
+    // the last parameter specifies if parent join fields can be ignored so that a single key can 
+    // be derrived for a multi-key buffer when the leading fields are in the join        
+    method public IQueryEntry GetKeyEntry (pcString as character,phBuffer as handle,plHasPublicNames as logical, plUseChildKeys as logical) :
         define variable cFieldMap as character no-undo.
         define variable pParameters as IStringStringMap no-undo.
         define variable oFieldValueParser as FieldValueParser no-undo.
         define variable oList as IList no-undo.        
+        
+        // support a single key value
+        pcString = ServiceInfo:ConvertSingleKeyToExpression(phbuffer, pcString, plHasPublicNames, plUseChildKeys).
+        
         do on error undo, throw:
             oFieldValueParser = new FieldValueParser().
             pParameters = oFieldValueParser:ParseExpressions(pcString, true). // keep quotes for vlaidation here
@@ -56,6 +57,7 @@ class Pmfo.Core.BusinessLogic.Parser.KeyValueParser:
                 undo, throw new IllegalArgumentError(subst("'&1' is not a valid expression",pcString),e).        
             end catch.
         end.
+        
         return GetKeyEntry (pParameters,phBuffer,plHasPublicNames).
             
     end.

@@ -86,6 +86,8 @@ class Pmfo.Core.DataLayer.LogicalFieldProxy inherits AbstractFieldProxy:
                 // if FalseStringValue ? then we store default value which requires no action\
                 if FalseStringValue <> ? then 
                     SourceField:buffer-value(SourceExtent) = FalseStringValue.
+                else 
+                    undo, throw new IllegalOperationError(subst("Cannot save &1 as false since false is undeterministic and defined as any value different than '&2'",this-object:Field:serialize-name,truestringvalue)).
             end.
             else // if we get here with null then save it.. 
                 SourceField:buffer-value(SourceExtent) = ?.
@@ -206,16 +208,23 @@ class Pmfo.Core.DataLayer.LogicalFieldProxy inherits AbstractFieldProxy:
     end.
   
     method override void SetBufferValue(pValue as character):
-        
         if pValue = TrueStringValue then
             this-object:Field:buffer-value = true.
-        else if pValue = FalseStringValue then
-           this-object:Field:buffer-value = false.
+        else if pValue = FalseStringValue or FalseStringValue = ? then
+            this-object:Field:buffer-value = false.
         else do:
             if ErrorOnReadIsFalse then 
                 this-object:Field:buffer-value = false.
             else    
-                undo, throw new IllegalStateError(subst("Database field '&1' value '&2' does not match any of the defined logical values for &3",SourceFullName,pValue,this-object:Field:name)).
+                undo, throw new IllegalStateError(subst("Database field '&1' value '&2' does not match any of the defined logical values for the &3 proxy~n&4",
+                                                        SourceFullName,
+                                                        pValue,
+                                                        this-object:Field:name,
+                                                        subst("The proxy is exposing the database fields as a logical values and is configured to interpret '&1' as true and '&2' as false. The error may indicate that the data has changed recently, typically the false value. Please Contact IT.",
+                                                              TrueStringValue,
+                                                              FalseStringValue
+                                                              )
+                                                        )).
         end.      
     end.
     

@@ -24,6 +24,7 @@ using Pmfo.Core.BusinessLogic.QueryPredicate from propath.
 using Pmfo.Core.BusinessLogic.IQueryPredicate from propath.
 using Ccs.Common.Support.IPrimitiveHolder from propath.
 using Ccs.Common.Support.IPrimitiveArrayHolder from propath.
+using Pmfo.Core.Error.IllegalArgumentError from propath.
 
 class Pmfo.Core.BusinessLogic.QueryGroup inherits Pmfo.Core.BusinessLogic.QueryEntry implements IQueryGroup: 
 
@@ -63,6 +64,14 @@ class Pmfo.Core.BusinessLogic.QueryGroup inherits Pmfo.Core.BusinessLogic.QueryE
         this-object:Join = pJoin. 
     end constructor.
     
+    method public logical HasEntry(pQueryEntry as IQueryEntry):
+        define variable i      as integer no-undo.
+        do i = 1 to extent(Entries):
+            if Entries[i]:Equals(pQueryEntry) then 
+                return true.
+        end.
+        return false.
+    end method.
     
     method public logical RemoveEntry(pQueryEntry as IQueryEntry):
         define variable oEntries as IQueryEntry extent no-undo.
@@ -74,7 +83,7 @@ class Pmfo.Core.BusinessLogic.QueryGroup inherits Pmfo.Core.BusinessLogic.QueryE
         do:
             extent(oEntries) = extent(Entries) - 1.
             do i = 1 to extent(Entries):
-               if Entries[i] = pQueryEntry then 
+               if Entries[i]:Equals(pQueryEntry) then 
                do:
                    iRemove = i.
                    leave.               
@@ -96,7 +105,7 @@ class Pmfo.Core.BusinessLogic.QueryGroup inherits Pmfo.Core.BusinessLogic.QueryE
             return false.
         end.
             
-        return true.     
+        
     end method.
     
     method public logical AddEntry(pQueryEntry as IQueryEntry):
@@ -104,6 +113,8 @@ class Pmfo.Core.BusinessLogic.QueryGroup inherits Pmfo.Core.BusinessLogic.QueryE
         define variable i as integer no-undo.
         define variable lAnyGroup as logical no-undo.
         define variable oSubGroup as QueryGroup no-undo.
+        if pQueryEntry = this-object then 
+            undo, throw new IllegalArgumentError("Cannot add itself as entry").
         if extent(Entries) > 0 then
         do:
             extent(oEntries) = extent(Entries) + 1.
@@ -390,6 +401,7 @@ class Pmfo.Core.BusinessLogic.QueryGroup inherits Pmfo.Core.BusinessLogic.QueryE
                 cExpression = cExpression 
                             + cJoin
                             + Entries[i]:ToString().
+                          .
             end.                
         end.    
         if plTrimParenthesis = false then

@@ -22,6 +22,7 @@ block-level on error undo, throw.
 using Ccs.Common.Support.IPrimitiveHolder from propath.
 using Pmfo.Core.Common.IFieldValue from propath.
 using Pmfo.Util.PrimitiveHolderUtil from propath.
+ 
 
 class Pmfo.Core.Common.FieldValue implements IFieldValue: 
 
@@ -81,5 +82,18 @@ class Pmfo.Core.Common.FieldValue implements IFieldValue:
         this-object (pcName, PrimitiveHolderUtil:GetHolder(ptValue)).
     end constructor.
     
+    method override public logical Equals(input PO as Progress.Lang.Object):
         
+        if super:Equals(PO) then
+            return true.
+        
+        if type-of(PO, IFieldValue) then
+        do:
+            if cast(PO, IFieldValue):Name = this-object:Name
+            and type-of(PO,IPrimitiveHolder) then 
+                return cast(PO,IPrimitiveHolder):Equals(PO).      
+        end.
+        return false.
+    end method.
+         
 end class.

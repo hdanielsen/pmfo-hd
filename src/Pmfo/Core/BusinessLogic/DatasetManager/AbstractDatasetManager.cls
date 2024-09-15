@@ -144,11 +144,12 @@ class Pmfo.Core.BusinessLogic.DatasetManager.AbstractDatasetManager abstract imp
     method public IBusinessEntity GetBusinessEntity(phbuffer as handle):
         define variable oEntity   as IBusinessEntity no-undo.
         find ttEntity where ttEntity.bufferHandle = phbuffer no-error.
+       
         if avail ttEntity then
             return cast(ttEntity.entity,IBusinessEntity).
               
         // NO-ERROR for not found - allow buffers with no entity  
-        // uae table-handle serialize-name - the buffer can be dsifferent (for example Relatiom aliasname) 
+        // uae table-handle serialize-name - the buffer can be different (for example Relatiom aliasname) 
         do on error undo, throw:
             oEntity = ServiceManager:CreateBusinessEntity(phbuffer:table-handle:serialize-name).
             catch e as NotFoundError :

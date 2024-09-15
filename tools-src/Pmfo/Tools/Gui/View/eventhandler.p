@@ -34,5 +34,9 @@ using Pmfo.Tools.Gui.View.IWidgetHandler from propath.
 define input  parameter pEventhandler as IWidgetHandler no-undo.
 procedure widgetEvent :
     define input parameter pcEvent as character no-undo.
-    pEventhandler:WidgetEvent(pcEvent).
-end procedure.    
+    if valid-object(pEventHandler) then
+        pEventhandler:WidgetEvent(pcEvent).
+    catch e as Progress.Lang.Error :
+            
+    end catch. 
+ end procedure.    

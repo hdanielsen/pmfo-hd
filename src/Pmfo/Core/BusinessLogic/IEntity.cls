@@ -39,5 +39,6 @@ interface Pmfo.Core.BusinessLogic.IEntity inherits IService, IResource:
     define public property CanRead        as logical        no-undo get.  
     define public property ClientOnly     as logical        no-undo get.
     define public property ServerType     as ServerTypeEnum no-undo get. 
+    define public property IsDeprecated   as logical        no-undo get.   
      
 end interface.

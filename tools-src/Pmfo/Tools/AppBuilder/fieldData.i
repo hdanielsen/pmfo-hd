@@ -17,6 +17,7 @@
     field dataType       as character label "Data Type"
     field isCalc         as logical   label "Calc"
     field inSDO          as logical   label "SDO"
+    field isJoin         as logical   label "Join"
     
     index idxName  is primary fieldName.
     

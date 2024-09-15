@@ -12,13 +12,14 @@
 block-level on error undo, throw.
 
 using Pmfo.Core.BusinessLogic.IJsonReadHandler from propath.
-using Progress.Json.ObjectModel.JsonObject from propath.
 using Pmfo.Core.BusinessLogic.ITrackLoadOrderAction from propath.
-using Pmfo.Core.Common.IFieldValue from propath.
-using Pmfo.Core.Common.IKey from propath.
-using Pmfo.Util.PrimitiveHolderUtil from propath.
 using Pmfo.Core.Common.FieldValue from propath.
+using Pmfo.Core.Common.IFieldValue from propath.
 using Pmfo.Core.Common.Key from propath.
+using Pmfo.Core.Error.NotImplementedError from propath.
+using Pmfo.Util.BufferUtil from propath.
+using Pmfo.Util.PrimitiveHolderUtil from propath.
+using Progress.Json.ObjectModel.JsonObject from propath.
  
 
 class Pmfo.Core.Common.JsonTrackSequenceHandler implements IJsonReadHandler: 
@@ -26,6 +27,7 @@ class Pmfo.Core.Common.JsonTrackSequenceHandler implements IJsonReadHandler:
     define protected property Entity      as character             no-undo get. set.    
     define protected property KeyList     as character             no-undo get. set.    
     define protected property FieldValues as IFieldValue extent    no-undo get. set.
+    define variable JoinedKeys as character no-undo.
     
     define private variable KeyCount as integer no-undo.
     /*------------------------------------------------------------------------------
@@ -41,6 +43,43 @@ class Pmfo.Core.Common.JsonTrackSequenceHandler implements IJsonReadHandler:
     end constructor.
         
     method public logical CheckReadOnlyAndPrepareBuffer( input phBuffer as handle, input pState as Pmfo.Core.BusinessLogic.RowStateEnum ):
+        define variable cParentJoins as character no-undo.
+        define variable cChildJoins as character no-undo.
+        define variable i as integer no-undo.
+        define variable IKey as integer no-undo.
+        define variable hParentfield as handle no-undo.
+        
+        if phbuffer:serialize-name = Entity then
+        do:
+            if valid-handle(phbuffer:parent-relation) then 
+            do:
+                cParentJoins = BufferUtil:GetParentJoinFields(phbuffer:parent-relation).
+                cChildJoins  = BufferUtil:GetChildJoinFields(phbuffer:parent-relation).
+                extent(FieldValues) = ?. 
+                extent(FieldValues) = num-entries(KeyList).
+                KeyCount = 0.
+                 
+                do i = 1 to num-entries(cChildJoins).
+                
+                    iKey = lookup(entry(i,cChildJoins),KeyList).
+                     
+                    if iKey > 0 then
+                    do: 
+                        hParentField = phbuffer:parent-relation:parent-buffer:buffer-field(entry(iKey,cParentJoins)). 
+                        FieldValues[IKey] = new FieldValue(hParentField:name,PrimitiveHolderUtil:GetHolder(hParentField)).  
+                        KeyCount = KeyCount + 1.
+                        JoinedKeys = JoinedKeys 
+                                   + (if JoinedKeys = "" then "" else ",")
+                                   + entry(i,cChildJoins).
+                    end.              
+                end. 
+                // rather unlikely, so throw not implmented    
+                if KeyCount = num-entries(KeyList) then 
+                     undo, throw new NotImplementedError("JsonTrackSequenceHandler load of child with all key values present in parent").
+                 
+            end.   
+            
+        end.    
         return false.
     end method.
 
@@ -53,15 +92,19 @@ class Pmfo.Core.Common.JsonTrackSequenceHandler implements IJsonReadHandler:
         
         if phFld:buffer-handle:serialize-name = Entity then
         do:
-            iKey =  lookup(phFld:name,KeyList). 
-           
+            // don't read if the field was loaded from parent join  
+            if JoinedKeys = "" or lookup(phFld:name,JoinedKeys) = 0 then
+                iKey =  lookup(phFld:name,KeyList). 
+            
             if iKey > 0 then 
             do: 
+                
                 if extent(FieldValues) = ? then
                 do: 
                     extent(FieldValues) = num-entries(KeyList). 
                     KeyCount = 0.
                 end.
+                   
                 case phFld:data-type:
                     when "character" then
                         phFld:buffer-value = pjson:GetCharacter(phFld:serialize-name).
@@ -88,10 +131,14 @@ class Pmfo.Core.Common.JsonTrackSequenceHandler implements IJsonReadHandler:
                 
                 FieldValues[iKey] = new FieldValue(phFld:name,PrimitiveHolderUtil:GetHolder(phFld)).
                 KeyCount = KeyCount + 1. 
+             
                 if KeyCount = extent(FieldValues) then 
                 do: 
-                   TrackAction:LoadSequences:Add(new Key(FieldValues)). 
-                   extent(FieldValues) = ?.
+                    TrackAction:LoadSequences:Add(new Key(FieldValues)). 
+                    if JoinedKeys = "" then 
+                        extent(FieldValues) = ?.
+                    else // if values from join then reset KeyCount to include the joined keys 
+                        KeyCount = num-entries(JoinedKeys).    
                 end.
                 return true.        
             end.

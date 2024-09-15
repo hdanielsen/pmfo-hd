@@ -34,10 +34,19 @@ oResourceBE:ReadFromSourceAndCacheData().
 if oResourceBe:WarningMessages:HasData then  
 do:
    cast(oResourceBe:WarningMessages,IWarningMessageTableHolder):GetWarningTableData(output table ttWarning) .
-   current-window:width = 300. 
-   for each ttWarning with width 300:
-       display  ttWarning.msg format "x(250)".
-   end.        
+   if session:remote then 
+   do: 
+       message "WARNINGs from generation of resources.json:".
+       for each ttWarning:
+           message ttWarning.msg.
+       end. 
+   end.
+   else do:     
+       current-window:width = 300. 
+       for each ttWarning with width 300:
+           display  ttWarning.msg format "x(250)".
+       end.    
+   end.    
 end.
 
 return "0". // PCT needs this to detect a successful run 

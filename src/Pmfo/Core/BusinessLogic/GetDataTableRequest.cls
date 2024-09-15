@@ -29,6 +29,7 @@ using Pmfo.Util.StringUtil from propath.
 using Ccs.Common.Support.IPrimitiveHolder from propath.
 using Pmfo.Util.Array from propath.
 using Ccs.Common.Support.IPrimitiveArrayHolder from propath.
+using Pmfo.Core.BusinessLogic.IQueryEntry from propath.
 
 class Pmfo.Core.BusinessLogic.GetDataTableRequest implements IGetDataTableRequest: 
     /* Returns the number of records requested by the caller of the Business Entity getData method */
@@ -64,6 +65,7 @@ class Pmfo.Core.BusinessLogic.GetDataTableRequest implements IGetDataTableReques
     define public property Count          as logical no-undo  get. set.
     define public property PageBackward   as logical no-undo  get. set.
     define public property ExternalPaging as logical no-undo  get. set.
+    
     // set to true by DataRequestBuilder so the server can identify where to support innerjoin  
     define public property IsMainTable    as logical no-undo  get. set.
     
@@ -72,9 +74,12 @@ class Pmfo.Core.BusinessLogic.GetDataTableRequest implements IGetDataTableReques
          
     // derrived from expands with option innerjoin=true - stored with table name
     define public property InnerJoinExpands as character no-undo  get. set.
+    
     // derrived from apply with qualified aggregate options  
     define public property InnerJoinAggregates as character   no-undo  get. set. 
-   
+    //  see interface
+    define public property ManualServerInnerJoins as character   no-undo  get. set.
+    
       // performance option - see comment in interfave
     define public property SelectFields   as character no-undo get. set. 
     /* Returns the Query String for this table */
@@ -320,6 +325,24 @@ class Pmfo.Core.BusinessLogic.GetDataTableRequest implements IGetDataTableReques
         return lok.
     end method.
      
+    method public logical HasQueryEntry(pQueryEntry as IQueryEntry):
+        define variable oDef as Pmfo.Core.BusinessLogic.IQueryDefinition no-undo.
+        define variable lOk as logical no-undo.
+        
+        if valid-object(pQueryEntry) then
+        do:
+            oDef = GetAndAssertQueryDefinition().
+            if valid-object(oDef) and valid-object(oDef:QuerySelection) then 
+            do:
+                if pQueryEntry:Equals(oDef:QuerySelection) then
+                    return true.
+                if type-of(oDef:QuerySelection,Pmfo.Core.BusinessLogic.IQueryGroup) then 
+                    return cast(oDef:QuerySelection,Pmfo.Core.BusinessLogic.IQueryGroup):HasEntry(pQueryEntry).
+            end.
+        end. 
+        return false.    
+    end method. 
+     
     method public logical RemoveQueryEntry(pQueryEntry as IQueryEntry):
         define variable oDef as Pmfo.Core.BusinessLogic.IQueryDefinition no-undo.
         define variable lOk as logical no-undo.
@@ -390,6 +413,7 @@ class Pmfo.Core.BusinessLogic.GetDataTableRequest implements IGetDataTableReques
         
         oDef = GetAndAssertQueryDefinition().
         cInnerJoins = InnerJoinExpands.
+         
         if valid-object(oDef) then   
         do:
             // DataSource:prepareInnerJoins will order these from parent to child 
@@ -402,10 +426,23 @@ class Pmfo.Core.BusinessLogic.GetDataTableRequest implements IGetDataTableReques
                     // if the table only is referenced in a filter and not in the client expand then
                     // this is a server only join
                     // This is extremely important for performance when filtering on values in one to many     
-                    if lookup(cTable,ClientExpands) = 0 then 
+                    if lookup(cTable,ClientExpands) = 0 then
+                    do: 
                         pcServerInnerjoins = StringUtil:AppendEntry(pcServerInnerJoins, cTable).
+                    end. 
                 end.        
             end.     
+        end.
+        
+        // property for complex cases  (for example a parent of a qualified grandchild field )
+        // assumed to not need to set innerJoins
+        if ManualServerInnerJoins > "" then 
+        do i = 1 to num-entries(ManualServerInnerJoins): 
+            cTable = entry(i,ManualServerInnerJoins). 
+            if lookup(cTable,cInnerJoins) = 0 then
+                cInnerJoins = StringUtil:AppendEntry(cInnerJoins, cTable). 
+            if lookup(cTable,ClientExpands) = 0 and lookup(cTable,pcServerInnerjoins) = 0 then
+                pcServerInnerjoins = StringUtil:AppendEntry(pcServerInnerjoins, cTable).           
         end.
         
         // table references only in aggregates must be added to the inner join  

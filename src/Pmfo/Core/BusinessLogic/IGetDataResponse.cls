@@ -15,8 +15,9 @@ using Pmfo.Core.BusinessLogic.IGetDataRequest from propath.
 using Pmfo.Core.BusinessLogic.RequestTypeEnum from propath.
 using Pmfo.Core.BusinessLogic.ResponseMetaDataEnum from propath.
 using Pmfo.Core.Common.IGetDataQuestions from propath.
+using Pmfo.Core.BusinessLogic.IDataResponse from propath.
 
-interface Pmfo.Core.BusinessLogic.IGetDataResponse inherits IGetDataResponse:  
+interface Pmfo.Core.BusinessLogic.IGetDataResponse inherits IGetDataResponse, IDataResponse:  
     
     define public property HasQuestions as logical no-undo get.  
     define public property Questions as IGetDataQuestions  no-undo get. 

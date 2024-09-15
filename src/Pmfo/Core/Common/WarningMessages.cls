@@ -65,6 +65,15 @@ class Pmfo.Core.Common.WarningMessages implements IWarningMessages, IWarningMess
         this-object:Dataset = phDataset.
     end constructor.
     
+    method public logical Clear ():
+        if can-find(first ttWarning) then 
+        do:
+            empty temp-table ttWarning.
+            return true.
+        end.     
+        return false.
+    end method.
+    
     method public logical AddAll (pcResource as character,poWarnings as IWarningMessages):
          define variable oWarnings as IWarning extent no-undo.
          define variable i as integer no-undo. 

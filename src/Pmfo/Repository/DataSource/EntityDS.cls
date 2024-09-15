@@ -28,6 +28,7 @@ using Pmfo.Core.BusinessLogic.IUpdateDataEventArgs from propath.
 using Pmfo.Core.Common.ServerTypeEnum from propath.
 using Pmfo.Core.BusinessLogic.IClientEntity from propath.
 using Pmfo.Core.BusinessLogic.IClientFilteredEntity from propath.
+using Pmfo.Core.BusinessLogic.IReceiveDataEventArgs from propath.
 
 class Pmfo.Repository.DataSource.EntityDS inherits ResourceSource: 
     {Pmfo/Repository/schema/entity.i reference-only}
@@ -106,23 +107,28 @@ class Pmfo.Repository.DataSource.EntityDS inherits ResourceSource:
         return ?. 
     end method.  
     
-    // separated out for override
-    method protected logical SubscribeReceive(pEntity as Progress.Lang.Object ):
+    // separated out for override - manages two settings for subclass that may have 
+    // additional rules that needs different values in ttEntity
+    method protected logical SubscribeReceive(pEntity as Progress.Lang.Object, 
+                                              output plMustInitializeForTableRead as logical
+                                           ):
         define variable oParamList as ParameterList  no-undo.
         define variable hHandle as handle no-undo.
         define variable oRequest as IGetDataTableRequest no-undo.
         define variable oResponse as IGetDataTableResponse no-undo.
+        define variable oReceiveArgs as IReceiveDataEventArgs no-undo.
         define variable oMethod as Method  no-undo.
+        define variable lSubscribe as logical no-undo.
         
         // we must always call receive in client BE 
         if type-of(pEntity,IClientEntity) then
-            return true. 
+            lSubscribe = true. 
         
         // we must always call receive in client filtered BE 
-        if type-of(pEntity,IClientFilteredEntity) then
-            return true. 
+        else if type-of(pEntity,IClientFilteredEntity) then
+            lSubscribe = true. 
         
-        if type-of(pEntity,IBusinessEntity) then
+        else if type-of(pEntity,IBusinessEntity) then
         do: 
             oParamList = new ParameterList(4).
             oParamList:SetParameter(1,get-class(IBusinessEntity):TypeName,"input",pEntity).
@@ -131,9 +137,23 @@ class Pmfo.Repository.DataSource.EntityDS inherits ResourceSource:
             oParamList:SetParameter(4,"handle","input",hhandle).
             
             oMethod = pEntity:GetClass():GetMethod("ReceiveBuffer",Progress.Reflect.Flags:Protected or Progress.Reflect.Flags:Instance or Progress.Reflect.Flags:DeclaredOnly,oParamList).
-            return valid-object(oMethod).
+            lSubscribe = valid-object(oMethod).
+            if lSubscribe = false then
+            do:
+                oParamList = new ParameterList(2).
+                oParamList:SetParameter(1,get-class(IReceiveDataEventArgs):TypeName,"input",oReceiveArgs).
+                oParamList:SetParameter(2,"handle","input",hhandle).
+                oMethod = pEntity:GetClass():GetMethod("BeforeReceiveData",Progress.Reflect.Flags:Protected or Progress.Reflect.Flags:Instance or Progress.Reflect.Flags:DeclaredOnly,oParamList).
+                lSubscribe = valid-object(oMethod).
+            end.
         end.
-        return false. 
+         
+        if type-of(pEntity,IBusinessEntity) then
+            plMustInitializeForTableRead = lSubscribe.
+        else   
+            plMustInitializeForTableRead = true.
+            
+        return lSubscribe.
     end method.
     
     // separated out for override
@@ -194,7 +214,7 @@ class Pmfo.Repository.DataSource.EntityDS inherits ResourceSource:
             do:
                 undo, throw new ApplicationError(ReservedResourceMessage("Entity" ,oEntity:GetClass():TypeName, "Resource","resources")).
             end.  
-              
+              define variable ldummy as logical no-undo.
             create ttEntity.
             assign
                 ttEntity.ClassName        = oEntity:getClass():TypeName
@@ -209,7 +229,7 @@ class Pmfo.Repository.DataSource.EntityDS inherits ResourceSource:
                 ttEntity.ClientOnly       = oEntity:ClientOnly
                 ttEntity.SubscribeAction  = SubscribeAction(oEntity)
                 ttEntity.SubscribeUpdate  = SubscribeUpdate(oEntity)
-                ttEntity.SubscribeReceive = SubscribeReceive(oEntity)
+                ttEntity.SubscribeReceive = SubscribeReceive(oEntity, output ttEntity.MustInitializeForTableRead)
                 ttEntity.SubscribeGet     = SubscribeGet(oEntity)
                 .
             if type-of(oEntity,IBusinessEntity) then

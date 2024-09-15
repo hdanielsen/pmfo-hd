@@ -97,7 +97,7 @@ class Pmfo.Core.BusinessLogic.Parser.BaseFilterParser:
     
     method protected IQueryEntry GetFilter(pBuffer as handle,pExpression as character):
         define variable cWorkexp       as character   no-undo.
-        define variable i              as integer     no-undo.
+        define variable iWord          as integer     no-undo.
         define variable cWord          as character   no-undo.
         define variable cRealValue     as character   no-undo.
         define variable cType          as character   no-undo.
@@ -141,8 +141,11 @@ class Pmfo.Core.BusinessLogic.Parser.BaseFilterParser:
         
         if num-entries(cWorkexp,StringConstant:SPACE) lt 3 then
             undo, throw new IllegalArgumentError(subst("Filter passed to GetFilter '&1'",pExpression)). 
-        do i = 1 to num-entries(cWorkexp,StringConstant:SPACE):
-            cWord = entry(i,cWorkexp,StringConstant:SPACE).
+        
+          
+        do iWord = 1 to num-entries(cWorkexp,StringConstant:SPACE):
+            cWord = entry(iWord,cWorkexp,StringConstant:SPACE).
+             
             if cWord <> "" then 
             do:
                 iCount = iCount + 1.
@@ -197,9 +200,12 @@ class Pmfo.Core.BusinessLogic.Parser.BaseFilterParser:
                         //       Tested many variations of inlist inside parenthesis and
                         //       there was never an extra parenthesis at thispoint    
                         if lInlist then
-                        do: 
+                        do on error undo, throw: 
                            //if trim(cValue) 
                             cValues = GetInListValues(cValue).
+                            catch e as Progress.Lang.Error :
+                                undo, throw new BadRequestError(subst("Invalid values encountered after IN operator in expression '&1'",pExpression),e).     
+                            end catch.
                         end.
                         else do:
                             cValue = right-trim(cValue,")").
@@ -221,8 +227,8 @@ class Pmfo.Core.BusinessLogic.Parser.BaseFilterParser:
                                                                           ) 
                                                                        ).   
                             if lInList then 
-                            do i = 1 to extent(cValues): 
-                                cValues[i] = GetAblStringValue(hQualBuffer, cField, cValues[i], pExpression).
+                            do iValue = 1 to extent(cValues): 
+                                cValues[iValue] = GetAblStringValue(hQualBuffer, cField, cValues[iValue], pExpression).
                             end.                                           
                             else
                                 cValue = GetAblStringValue(hQualBuffer, cField, cValue, pExpression).
@@ -234,8 +240,8 @@ class Pmfo.Core.BusinessLogic.Parser.BaseFilterParser:
                             // allow subclass to map the external value (json) to an internal value (tt)
                             cfield = GetUseFieldName(pBuffer,cfield).
                             if lInList then 
-                            do i = 1 to extent(cValues): 
-                                cValues[i] = GetAblStringValue(pBuffer, cField, cValues[i], pExpression).
+                            do iValue = 1 to extent(cValues): 
+                                cValues[iValue] = GetAblStringValue(pBuffer, cField, cValues[iValue], pExpression).
                             end.                                           
                             else
                                 cValue = GetAblStringValue(pBuffer, cField, cValue, pExpression).
@@ -243,7 +249,9 @@ class Pmfo.Core.BusinessLogic.Parser.BaseFilterParser:
                         end.
                         
                         if lInlist then
+                        do:
                             oPredicate = new QueryPredicate(cFieldname,oOperator,cValues).
+                        end.
                         else do:
                             if lendsWith then 
                                 cValue = "*" + cValue.
@@ -280,18 +288,20 @@ class Pmfo.Core.BusinessLogic.Parser.BaseFilterParser:
                     
                     oEntries:Add(oEntry).
                     assign 
-                        i      = i + num-entries(cSubExpression,StringConstant:SPACE) - 1
+                        iWord  = iWord + num-entries(cSubExpression,StringConstant:SPACE) - 1
                         iPos   = ipos + length(cSubExpression) + 1
                         cField = ""
                         iCount = -1   
                         cWord  = "" 
                         oJoin  = ?
                         lContains  = false
-                        lEndswith = false. 
+                        lEndswith = false 
                         lNot = false
+                        lInlist = FALSE
                         .
                 end.
                 else do:
+                   
                     if iCount = 3 then 
                     do:
                        if lNot then 
@@ -299,6 +309,7 @@ class Pmfo.Core.BusinessLogic.Parser.BaseFilterParser:
                        if valid-object(oJoin) then
                            oPredicate:Join = oJoin.
                        oEntries:Add(oPredicate).
+                       
                        assign
                            iCount    = -1 
                            cField    = ""
@@ -309,8 +320,8 @@ class Pmfo.Core.BusinessLogic.Parser.BaseFilterParser:
                            lEndswith = false
                            linlist   = false 
                            lNot = false.
-                       
                     end.
+                   
                     iPos = iPos + length(cWord) + 1.
                     cWord = "".
                 end.               
@@ -349,6 +360,9 @@ class Pmfo.Core.BusinessLogic.Parser.BaseFilterParser:
             if index(cWorkExpression,"'") > 0 or index(cWorkExpression,'"') > 0 then
                 cWorkExpression = StringUtil:MaskCharInQuotes(cWorkExpression,",",output iCharnum).
             
+            if num-entries(cWorkExpression) = 0 then 
+               undo, throw new IllegalArgumentError(subst("Empty parenthesis encountered after IN operator. The IN operator expects a comma separated list of values inside the parenthesis.")).
+         
             extent(cValues) = num-entries(cWorkExpression).
             do i = 1 to extent(cValues):   
                cValueEntry = trim(entry(i,cWorkExpression)).
@@ -361,6 +375,7 @@ class Pmfo.Core.BusinessLogic.Parser.BaseFilterParser:
         else 
             undo, throw new IllegalArgumentError(subst("Invalid value list &1 encountered after IN Operator. The values must be specifed as a comma separated list in parenthesis.")).
         return cValues.
+        
     end method.  
     
     method protected character GetAblStringValue(phBuffer as handle,pcFieldName as character, pcClientValue as character, pcExpression  as character):

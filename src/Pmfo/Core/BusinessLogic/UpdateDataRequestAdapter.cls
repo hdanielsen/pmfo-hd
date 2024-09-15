@@ -28,6 +28,8 @@ using Pmfo.Core.Error.UnsupportedOperationError from propath.
 using Pmfo.Util.DatasetUtil from propath.
 using Progress.Lang.Object from propath.
 using Progress.Lang.ParameterList from propath.
+using Pmfo.Core.Common.IGetDataMessages from propath.
+using Pmfo.Core.Common.GetDataMessages from propath.
 
 
 class Pmfo.Core.BusinessLogic.UpdateDataRequestAdapter final implements IUpdateDataRequest: 
@@ -36,7 +38,17 @@ class Pmfo.Core.BusinessLogic.UpdateDataRequestAdapter final implements IUpdateD
     
     define public property NoTargetTables      as character no-undo get.   
     define public property CheckReadOnlyTables as character no-undo get. protected set. 
-      
+    
+     define public property Messages as IGetDataMessages  no-undo 
+        get():
+            // todo - should  this return a place holder that prevents adding messages? 
+            // very academic this adapter is probalby never used 
+            if not valid-object(Messages) then 
+                Messages = new GetDataMessages().
+            return Messages.    
+        end.    
+        protected set.
+    
     define public property NoRefresh           as logical no-undo get. set.
     
     define public property Action             as IAction no-undo  
@@ -164,5 +176,7 @@ class Pmfo.Core.BusinessLogic.UpdateDataRequestAdapter final implements IUpdateD
     method public character GetConfirmedQuestions  ( pcSourceEntityname as character):
        return "". // Confirmations does not have public setter so this cannot return any value  
     end.     
-     
+    
+    method void RemoveClientMethod():
+    end method. 
 end class.

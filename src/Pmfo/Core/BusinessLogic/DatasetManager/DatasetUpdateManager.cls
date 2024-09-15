@@ -33,7 +33,7 @@ class Pmfo.Core.BusinessLogic.DatasetManager.DatasetUpdateManager inherits Abstr
     end constructor.
     
     method protected override logical DoSubscribe(phBuffer as handle, pRequest as IRequest).
-        return phBuffer:table-handle:has-records. 
+        return true.  // return true - receive may create data for client after an update also - old logic: phBuffer:table-handle:has-records. 
     end method.
      
     method protected override logical ProcessTopTable(phBuffer as handle, pRequest as IRequest, pBusinessEntity as IBusinessEntity):
@@ -50,30 +50,42 @@ class Pmfo.Core.BusinessLogic.DatasetManager.DatasetUpdateManager inherits Abstr
         define variable lHasClientUpdate  as logical no-undo.
         define variable lSubscribeReceive as logical no-undo.
         define variable lTop              as logical no-undo.
-        
         if valid-object(pBusinessEntity) and phBuffer:table-handle:serialize-name = pBusinessEntity:Resource then
         do:
             oEntity = pBusinessEntity.
            // CreateEntity(phBuffer, pBusinessEntity). 
             lTop = true.
         end.    
-        else do: // returns ? if the entity does not need before update processing/validation 
-            
-            oEntity = ServiceManager:CreateBusinessEntityForRequest(phBuffer:table-handle:serialize-name, 
-                                                                   if poUpdateArgs:Request:ActionName > "" then EntityRequestTypeEnum:Action else EntityRequestTypeEnum:Update,
-                                                                   output lHasClientUpdate,
-                                                                   output lSubscribeReceive).
-                                                                  
-            if valid-object(oEntity) then
+        else do: // returns ? if the entity does not need before update processing/validation
+            // Parent BEs may have called GetBusinessEntityForDataset for a child from ValidateTable  
+            // so if it is already there return it    
+            oEntity = GetStartedBusinessEntity(phbuffer).
+            if not valid-object(oEntity) then
             do:
-                // keep track for receive hook subsctibeic
-                // - note that we need these also if the object itself does not SubscribeReceive
-                // since the event is publisfed through the dataset tree.
-                // Note that GetBusinessEntity will create ttEntity if it was not created here  
-                // it calls CreateBusinessEntity and may get return that does not subscribe
-                // it also creates ttEntoty if no BE exists for buffer   
-                CreateEntity(phBuffer, oEntity).  
+                oEntity = ServiceManager:CreateBusinessEntityForRequest(phBuffer:table-handle:serialize-name, 
+                                                                       if poUpdateArgs:Request:ActionName > "" then EntityRequestTypeEnum:Action else EntityRequestTypeEnum:Update,
+                                                                       output lHasClientUpdate,
+                                                                       output lSubscribeReceive).
+                if valid-object(oEntity) then
+                do:
+                    
+                    // keep track for receive hook subsctibeic
+                    // - note that we need these also if the object itself does not SubscribeReceive
+                    // since the event is publisfed through the dataset tree.
+                    // Note that GetBusinessEntity will create ttEntity if it was not created here  
+                    // it calls CreateBusinessEntity and may get return that does not subscribe
+                    // it also creates ttEntoty if no BE exists for buffer   
+                    CreateEntity(phBuffer, oEntity).  
+                end.
             end.
+            else do:
+                lHasClientUpdate = ServiceManager:BusinessEntityHasRequestType(
+                     phBuffer:table-handle:serialize-name, 
+                     if poUpdateArgs:Request:ActionName > "" 
+                     then EntityRequestTypeEnum:Action 
+                     else EntityRequestTypeEnum:Update
+                 ).
+            end.   
         end.
         if valid-object(oEntity) and (lTop or lHasClientUpdate) then
         do:

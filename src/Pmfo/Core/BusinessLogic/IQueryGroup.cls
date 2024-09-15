@@ -21,7 +21,8 @@ using Ccs.Common.Support.IPrimitiveArrayHolder from propath.
 interface Pmfo.Core.BusinessLogic.IQueryGroup inherits IQueryGroup, Pmfo.Core.BusinessLogic.IQueryEntry:  
     method public logical RemoveEntry(pQueryEntry as IQueryEntry).
     method public logical AddEntry(pQueryEntry as IQueryEntry).
-    
+    method public logical HasEntry(pQueryEntry as IQueryEntry).
+     
     method public IQueryPredicate AddEntry(pcField as character,pOperator as QueryOperatorEnum,pcValue as character).
     method public IQueryPredicate AddEntry(pcField as character,pOperator as QueryOperatorEnum,piValue as int64).
     method public IQueryPredicate AddEntry(pcField as character,pOperator as QueryOperatorEnum,plValue as logical).

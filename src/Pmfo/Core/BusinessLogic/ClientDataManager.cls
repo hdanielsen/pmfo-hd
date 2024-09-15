@@ -55,9 +55,10 @@ class Pmfo.Core.BusinessLogic.ClientDataManager abstract:
     end.     
     
     method protected logical UseClientQuery(pRequest as IGetDataTableRequest,input phBuffer as handle):
-        
         // NOTE: Request:Count is NOT included in the check - all client methods that reads/creates/managed data returns a count 
-        return valid-object(pRequest:QueryDefinition) or valid-handle(phBuffer:parent-relation) or pRequest:IsPaging .
+        return valid-object(pRequest:QueryDefinition) 
+               or (NoParentJoin = false and valid-handle(phBuffer:parent-relation)) 
+               or pRequest:IsPaging .
     end method.    
     
     method protected rowid GetSourceRowid(phSourceBuffer as handle, pQueryContext as Ccs.BusinessLogic.IQueryEntry) :

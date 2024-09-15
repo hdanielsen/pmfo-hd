@@ -16,17 +16,23 @@
         define variable i as integer no-undo.
         define variable i1length as integer no-undo.
         define variable i2length as integer no-undo.
-        assign
-            i1length = extent(p1) 
-            i2length = extent(p2) 
-            extent(vArray) = i1Length + i2length
-        .
-        
+        if extent(p1) <> ? then
+        do: 
+            i1length = extent(p1).
+            extent(vArray) = i1Length.
+        end.
+        if extent(p2) <> ? then
+            i1length = extent(p2).
+            
         do i = 1 to i1length + i2length:
             if i <= i1length then 
                 vArray[i] = p1[i].
             else do:
-                varray[i] = p2[i - i1length]. 
+                if Pmfo.Util.Array:Find(p2[1],varray) = 0 then.
+                do:  
+                    extent(varray) = (if extent(varray) = ? then 0 else extent(varray)) + 1.              
+                    varray[extent(varray)] = p2[i - i1length].
+                end.    
             end.             
         end.     
          

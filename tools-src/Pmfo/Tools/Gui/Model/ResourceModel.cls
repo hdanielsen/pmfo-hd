@@ -43,13 +43,19 @@ using Pmfo.Util.FileIO from propath.
 using Progress.Lang.ParameterList from propath.
 using Progress.Reflect.Constructor from propath.
 using Pmfo.Tools.Gui.Model.AbstractResourceModel from propath.
+using Pmfo.Tools.Gui.Model.ISdoModel from propath.
+using Pmfo.Tools.Gui.Model.AdoModel from propath.
+using Pmfo.Core.Error.IllegalStateError from propath.
+using Pmfo.Util.StringUtil from propath.
 
 class Pmfo.Tools.Gui.Model.ResourceModel inherits AbstractResourceModel implements IResourceModel: 
     {Pmfo/Util/filedata.i}
    
    
     define protected variable fileIo as FileIO no-undo.
-  
+    
+    define public property AdoModelType as Progress.Lang.Class no-undo get. set. 
+    
     define public property MonitorSources   as character extent no-undo get. set.
     define protected property ServiceManager as IServiceManager no-undo 
         get():  
@@ -58,8 +64,8 @@ class Pmfo.Tools.Gui.Model.ResourceModel inherits AbstractResourceModel implemen
     
    
     define stream filestream.
-        
-    constructor public ResourceModel ( ):
+    
+   constructor public ResourceModel ( ):
         define variable i as integer no-undo.
         super (input "File").
         fileio = new FileIO().
@@ -76,54 +82,121 @@ class Pmfo.Tools.Gui.Model.ResourceModel inherits AbstractResourceModel implemen
     end constructor.
     
     method override public void  FetchData().
+        // use FetchDataFromDirectores
         undo, throw new NotImplementedError("FetchData()").
     end.      
     
     method override public void FetchData(pcQuery as character).
-        FetchData (pcQuery,?).
+        // use FetchDataFromDirectores
+        undo, throw new NotImplementedError().
+      //  FetchData (pcQuery,"",?).
     end method.
     
-    method override public void FetchData(pcQuery as character, pMonitor as IMonitor):
-    
+    method public void FetchDataFromDirectores(pcDirs as character, pMonitor as IMonitor):
+        define variable cFullpaths as character no-undo.
         define variable i as integer no-undo.
+        do i = 1 to num-entries(pcDirs):  
+            cFullPaths = StringUtil:AppendEntry(cFullPaths,GetFullDirectoryPath(entry(i,pcdirs))).
+        end.
+        FetchData(cFullPaths,pcDirs,pMonitor).
+    end method.
+    
+    method protected integer GetFiles(pcDirs as character,output table fileData):
+        define variable i as integer no-undo.
+        define variable iFiles as integer no-undo.
+        do i = 1 to num-entries(pcDirs):  
+            iFiles = ifiles + fileio:getFiles(entry(i,Pcdirs), output table fileData append).
+        end.
+        return ifiles.
+        finally:
+      //      delete object phFiledata.
+        end.     
+    end method.     
+    
+    method public override void FetchData(pcQuery as character, pMonitor as IMonitor):
+        // use FetchDataFromDirectores
+        undo, throw new NotImplementedError().
+        // FetchData(pcQuery,"",pMonitor).
+    end method.
+    
+    // 
+    method protected void FetchData(pcQueries as character, pcRelativeDirs as character, pMonitor as IMonitor):
+    
+        define variable iDb as integer no-undo.
         define variable iFiles as integer no-undo.
         define variable service as IDataAdminService  no-undo.
         define variable rrowid as rowid no-undo.
         define variable oTable as ITable no-undo.
         define variable iMonitor as integer no-undo.
         define variable oMonitorTarget as IMonitorTarget no-undo.
-     
+        define variable ipathnum as integer no-undo.
+        define variable idir as integer no-undo.
+        define variable cPath as character no-undo.
+        define variable lAddPath as logical no-undo.
         empty temp-table fileData.
         empty temp-table resourceData.
-        if pcQuery > "" then
+         
+        if pcQueries > "" then
         do:
-            iFiles = fileio:getFiles(pcQuery, table fileData).
+          //  iFiles = fileio:getFiles(pcQuery, output table fileData).
+            iFiles = GetFiles(pcQueries,output table fileData by-reference).
+             
             if valid-object(pMonitor) then
             do:
                 pMonitor:Targets[1]:Total = ifiles.
-            end.    
+            end.
+            lAddPath = num-entries(pcQueries) > 1 
+                       or 
+                       // the ado has DatalogicProcedure with relative path so add path to all names
+                       can-find(first filedata where filedata.fileExt = "ado").
+            
+               
             for each fileData:
+                
+                if pcRelativeDirs > "" then 
+                do:
+                    // TODO - improve...
+                    // a bit messy - probably best fixed by moving getfiles out and then cal this with better i nfi
+                    // (this was done as a quick fix to support multiple sdo fix and keep tjhe monitor counts correct) 
+                    do idir = 1 to num-entries(pcQueries):
+                        if fileData.fullPath begins entry(iDir,pcQueries) then
+                        do:
+                            cPath =  entry(idir,pcRelativeDirs).
+                            leave. 
+                        end.
+                    end.
+                end.
+                
                 if fileData.fileExt = "w" then
                 do:
-                    CreateSdoResource(fileData.fullPath).
+                    // todo impoirve the path logic 
+                    CreateSdoResource(fileData.fullPath,if lAddpath then cPath else "").
                 end.
                 else if fileData.fileExt = "p" then
                 do:
-                     CreateDlpResource(fileData.fullPath).
+                    // todo impoirve the path logic 
+                    CreateDlpResource(fileData.fullPath,if lAddpath then cPath else "").
                 end.
+                else if fileData.fileExt = "ado" then
+                do:
+                    // todo impoirve the path logic 
+                    CreateSdoResourceFromAdo(fileData.fullPath,if lAddpath then cPath else "").
+                end.
+                 
                 if valid-object(pMonitor) then
-                   pMonitor:Targets[1]:Increment().
+                    pMonitor:Targets[1]:Increment().
             
             end.
         end.
-        do i = 1 to num-dbs:
-            service = new DataAdminService(ldbname(i)).
+        
+        do iDb = 1 to num-dbs:
+            service = new DataAdminService(ldbname(iDb)).
             
             if valid-object(pMonitor) then
-               oMonitorTarget = pMonitor:Targets[i + 1].
+               oMonitorTarget = pMonitor:Targets[iDb + 1].
              
             AddTables(service,oMonitorTarget).
-            iMonitor = i + 1. 
+            iMonitor = iDb + 1. 
         end.
         if valid-object(CodeTableModel) then
         do:
@@ -147,6 +220,7 @@ class Pmfo.Tools.Gui.Model.ResourceModel inherits AbstractResourceModel implemen
             oMonitorTarget = pMonitor:Targets[iMonitor].
         // this is supposed to run last     
         FetchManualIncludesFromDir(DefinitionDir,oMonitorTarget).
+        
         catch e as CancelError:
            undo, throw e.    
         end catch.
@@ -286,7 +360,8 @@ class Pmfo.Tools.Gui.Model.ResourceModel inherits AbstractResourceModel implemen
          define variable oTable       as ITable     no-undo.
          define variable cTable       as character  no-undo.
          define variable oDataFields  as ISet no-undo.
-         
+         define variable iTable       as integer no-undo.
+         define variable cQueryTables as character no-undo.
          oTables = pService:getTables().
          if valid-object(pMonitorTarget) then
             pMonitorTarget:Total = oTables:Count.
@@ -294,22 +369,25 @@ class Pmfo.Tools.Gui.Model.ResourceModel inherits AbstractResourceModel implemen
          do while oIter:HasNext():
              oTable = cast(oIter:Next(),ITable).
              cTable = oTable:name.
-             
              find resourceData where resourceData.tableName = cTable no-error .
+            
              if avail resourceData then do:
                  resourceData.tempdb = pservice:Name = "tempdb".
                  resourceData.definedinDb = true.
                  oDataFields = GetDataFields(oTable).
-                 AddPublicNameToFields(oDataFields,NameService).
+                 AddPublicNameToFields(cTable,oDataFields,NameService).
                  
                  // merge table fields with sdo fields 
                  if valid-object(resourceData.sdoFields) then 
                  do:
-                     cast(resourceData.sdoFields,ISet):AddAll(oDataFields).
+                     cast(resourceData.sdoModel,ISdoModel):AddFieldsFromDataAdmin(oTable).
+                     AddPublicNameToFields(cTable,cast(resourceData.sdofields,ISet),NameService).
+                 
                  end.
                  else // ?? 
                       resourcedata.dbFields = oDataFields. 
-           
+                 
+                 
              end.
              else if ambiguous resourceData then do:
                  for each resourceData where resourceData.tableName = cTable:
@@ -330,12 +408,40 @@ class Pmfo.Tools.Gui.Model.ResourceModel inherits AbstractResourceModel implemen
                   AfterRow(input table resourceData by-reference).  
                   oDataFields = GetDataFields(oTable).
                   resourcedata.dbFields = oDataFields. 
-                  AddPublicNameToFields(oDataFields,NameService).
+                  AddPublicNameToFields(cTable,oDataFields,NameService).
              end.     
              if valid-object(pMonitorTarget) then
                 pMonitorTarget:Increment().
          end.
+         
+         // the data type in ADOs is unreliable
+         for each resourceData where resourceData.databaseName = pService:name
+                                 and type-of(resourceData.sdoModel,AdoModel): 
+             cQueryTables = cast(resourceData.sdoModel,AdoModel):QueryTables.      
+             do iTable =  1 to num-entries(cQueryTables): 
+                 // TODO physical tables can should really be used
+                 oTable = oTables:Find(entry(iTable,cQueryTables)).
+                     // as of current this only corrects data type and sourcetable
+                 cast(resourceData.sdoModel,AdoModel):updateDataFieldsFromDataAdmin(oTable). 
+             end.              
+        end.         
     end.      
+    
+    method protected void showfields(pFields as Iset): 
+        define variable oIter as OpenEdge.Core.Collections.IIterator no-undo.
+        define variable cc as character no-undo.
+        define variable oFieldModel as FieldModel no-undo.
+        oIter = pfields:Iterator().
+        
+        do while oIter:HasNext(): 
+            oFieldmodel = cast(oIter:Next(),FieldModel).
+         
+            cc = cc + subst("~n*Name: &1  Tbl: &2 Src: &3 SrcDB: &4",oFieldModel:name,oFieldModel:sourceTable,oFieldModel:SourceName,oFieldModel:sourceDb). 
+            
+        end.    
+        message cc
+        view-as alert-box.
+    end method.     
     
     method public ISet GetDataFields(pTable as ITable):
         define variable oFieldIter   as IIterator no-undo.
@@ -352,6 +458,7 @@ class Pmfo.Tools.Gui.Model.ResourceModel inherits AbstractResourceModel implemen
             oField = cast(oFieldIter:Next(),IField).
             odatafield = new FieldModel().
             oDataField:name = oField:Name.
+            oDataField:sourcename = oField:Name.
             oDataField:sourceTable = pTable:name.
             oDataField:dataType = oField:DataType.
             oDataFields:Add(oDataField).
@@ -360,7 +467,7 @@ class Pmfo.Tools.Gui.Model.ResourceModel inherits AbstractResourceModel implemen
     end method.     
     
     // public - currently used as util 
-    method public void AddPublicNameToFields(pfields as ICollection,pNameService as INameService):
+    method public void AddPublicNameToFields(pcTableName as character,pfields as ICollection,pNameService as INameService):
         define variable oIter  as OpenEdge.Core.Collections.IIterator no-undo.
         define variable oField as FieldModel no-undo.
         
@@ -368,8 +475,8 @@ class Pmfo.Tools.Gui.Model.ResourceModel inherits AbstractResourceModel implemen
         do:
             oIter = pFields:Iterator().
             do while oIter:HasNext():
-                 oField = cast(oIter:Next(),FieldModel).
-                 oField:serializeName = pNameService:PublicFieldName(oField:Name).
+                oField = cast(oIter:Next(),FieldModel).
+                oField:serializeName = pNameService:PublicFieldName(pcTableName,oField:Name).
             end.
         end.    
     end method.    
@@ -379,7 +486,72 @@ class Pmfo.Tools.Gui.Model.ResourceModel inherits AbstractResourceModel implemen
       
     end method.    
     
-    method protected rowid CreateSdoResource(pcfilename as char):
+    method protected rowid CreateSdoResourceFromAdo(pcfilename as char, pcUsePathname as character):
+        define variable oAdoModel  as AdoModel no-undo.
+    
+        if valid-object(AdoModelType) then 
+            oAdoModel = cast(AdoModelType:new(),AdoModel).
+        else 
+            undo, throw new IllegalStateError("Load of ADO without an ADO Model class defined.").
+                 
+        if oAdoModel:Parse(pcFilename) then
+        do:
+            return AssignSdoModelToResource(oADOModel,pcUsePathname).
+        end.
+        else do:
+            delete object oAdoModel.
+            return ?. 
+        end. 
+    end.
+    
+    method protected rowid AssignSdoModelToResource(poSDO as ISdoModel,pcUsePathname as character):
+        define buffer bResourceData for resourceData.
+       
+        // check if there is resource created for the dlp 
+     
+        find resourceData where resourceData.dlpname = poSdo:DataLogicProcedure 
+                          and   resourceData.sdoname = "" no-error.
+        if not avail resourcedata then do: 
+                             
+            create resourceData.
+            assign 
+                resourceData.dlpname   = poSdo:DataLogicProcedure. // full path
+                
+            if resourceData.dlpname > "" then
+                resourceData.dlpDisplayName  = left-trim(subst("&1/&2",
+                                                          pcUsePathname, 
+                                                          entry(num-entries(ResourceData.dlpName,StringConstant:BACKSLASH),ResourceData.dlpName,StringConstant:BACKSLASH) 
+                                                        ),"/")
+                                                        .
+            /* in the odd case that the dlp is used by more than one SDO it may already 
+               have been assigned to an sdo resource - in that case use the same model
+               use find first as there could be more than one   
+            */ 
+            find first bresourceData where bresourceData.dlpname = poSDO:DataLogicProcedure 
+                                       and valid-object(bresourceData.dlpModel) no-error.
+            if avail bresourceData then
+                resourceData.dlpModel = bresourceData.dlpModel.
+             
+        end.  
+        
+        assign  
+            resourceData.SdoName        = poSDO:Name
+            resourceData.SdoDisplayName = left-trim(subst("&1/&2",pcUsePathname,
+                                                          entry(num-entries(ResourceData.sdoName,StringConstant:BACKSLASH),ResourceData.sdoName,StringConstant:BACKSLASH) 
+                                                          ),"/")
+            resourceData.tableName      = poSDO:Table
+            resourceData.databaseName   = poSDO:DataBase
+            resourceData.SdoModel       = poSDO
+            resourceData.sdoFields      = poSDO:Fields 
+            resourceData.className      = NameService:ClassName(resourceData.tableName)
+            .
+           
+        AfterRow(input table resourceData by-reference). 
+        AddPublicNameToFields(poSdo:Table,poSDO:Fields,NameService).
+        return rowid(resourceData).
+    end method.    
+    
+    method protected rowid CreateSdoResource(pcfilename as char, pcUsePathname as character):
         define variable oSdoModel  as SdoModel no-undo.
         define variable lNew       as logical no-undo.
         define buffer bResourceData for resourceData.
@@ -387,37 +559,9 @@ class Pmfo.Tools.Gui.Model.ResourceModel inherits AbstractResourceModel implemen
         
         if oSdoModel:Parse(pcFilename) then
         do:
-            // check if there is resource created for the dlp 
-            find resourceData where resourceData.dlpname = oSDoModel:DataLogicProcedure 
-                              and   resourceData.sdoname = "" no-error.
-            if not avail resourcedata then do: 
-                                 
-                create resourceData.
-                assign 
-                    resourceData.dlpname   = oSdoModel:DataLogicProcedure
-                    lnew = true.
-                /* in the odd case that the dlp is used by more than one SDO it may already 
-                   have been assigned to an sdo resource - in that case use the same model
-                   use find first as there could be more than one   
-                */ 
-                find first bresourceData where bresourceData.dlpname = oSDoModel:DataLogicProcedure 
-                                           and valid-object(bresourceData.dlpModel) no-error.
-                if avail bresourceData then
-                    resourceData.dlpModel = bresourceData.dlpModel.    
-            end.  
-        
-            assign  
-                resourceData.SdoName        = oSdoModel:Name
-                resourceData.tableName      = oSdoModel:Table
-                resourceData.databaseName   = oSdoModel:DataBase
-                resourceData.SdoModel       = oSdoModel
-                resourceData.sdoFields      = oSdoModel:Fields 
-                resourceData.className      = NameService:ClassName(resourceData.tableName)
-                .
-                 
-            AfterRow(input table resourceData by-reference). 
-            AddPublicNameToFields(oSdoModel:Fields,NameService).
-            return rowid(resourceData).
+            // if pcUsePathname > " " then  
+            //     oSdoModel:name = "".  
+            return AssignSdoModelToResource(oSDOModel,pcUsePathname).
         end.
         else do:
             delete object oSdoModel.
@@ -511,12 +655,14 @@ class Pmfo.Tools.Gui.Model.ResourceModel inherits AbstractResourceModel implemen
     end method.    
     
     
-    method protected void CreateDlpResource(pcfilename as char):
+    method protected void CreateDlpResource(pcfilename as char, pcUsePathname as character):
         define variable oDlpModel  as DlpModel  no-undo.
         define variable lFound as logical no-undo.
         oDlpModel = new DlpModel ().
+        
         if oDlpModel:Parse(pcFilename) then
         do:
+            // dlpname and  dlpmodel name is full path
             for each resourceData where resourceData.dlpname = oDlpModel:Name:
                 resourceData.DlpModel  = oDlpModel.
                 lFound = true.
@@ -525,18 +671,45 @@ class Pmfo.Tools.Gui.Model.ResourceModel inherits AbstractResourceModel implemen
             do:
                 create resourceData.
                 assign 
-                    resourceData.dlpName     = oDlpModel:Name
-                    resourceData.DlpModel    = oDlpModel 
-                    KeyCounter               = KeyCounter + 1
-                    resourceData.resourceNum = KeyCounter 
+                    resourceData.dlpName         = oDlpModel:Name // full path
+                    resourceData.dlpDisplayName  = left-trim(subst("&1/&2",
+                                                          pcUsePathname, 
+                                                          entry(num-entries(ResourceData.dlpName,StringConstant:BACKSLASH),ResourceData.dlpName,StringConstant:BACKSLASH) 
+                                                        ),"/")
+                                                           
+                    resourceData.DlpModel        = oDlpModel 
+                    KeyCounter                   = KeyCounter + 1
+                    resourceData.resourceNum     = KeyCounter 
                     . 
             end.
         end.
-        else            
+        else do:        
             delete object odlpModel.
+        end.    
     end.
     
+    method protected character GetFullDirectoryPath( pcdir as character ):
+       /*------------------------------------------------------------------------------
+         Purpose:
+         Notes:
+        ------------------------------------------------------------------------------*/    
+       file-info:file-name = pcdir.
+       
+       if not file-info:file-type matches "*D*" then
+           message subst("&1 &2 failed. This is not a directory",entry(1,program-name(2),""),pcDir) 
+           view-as alert-box warning. 
+       if file-info:full-pathname = ? then
+           
+           message subst("&1 &2 failed. Directory does not exist",entry(1,program-name(2),""),pcDir) 
+           view-as alert-box warning. 
+       
+       return file-info:full-pathname. 
+        
+    end method.
+    
+    
     method override public void  FetchData(pcTables as char extent,pcQueries as character extent).
+       undo, throw new NotImplementedError().
     end.      
      
 end class.

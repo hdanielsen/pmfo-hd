@@ -89,7 +89,9 @@ class Pmfo.Core.BusinessLogic.Parser.ExpandOptionsParser:
     end method.
     
     method public void ResolveProperties():
-        define variable cExpand as character no-undo.
+        define variable cExpand      as character no-undo.
+        define variable cExpandEntry as character no-undo.
+        define variable i       as integer no-undo.
         if ExpandIsResolved = false then
         do:   
             cExpand     = string(UriQuery:Get(ExpandProp)).
@@ -97,8 +99,22 @@ class Pmfo.Core.BusinessLogic.Parser.ExpandOptionsParser:
             do:
                 ParseExpression(cExpand).               
             end.
-            else 
-                mFlatExpand = cExpand.           
+            else do:
+                if index(cExpand,"measurements") > 0 then
+                do i = 1 to num-entries(cExpand):
+                    cExpandEntry = entry(i,cExpand).
+                    if entry(num-entries(cExpandEntry,"/"),cExpandEntry,"/") = "measurements" then
+                    do:
+                        cExpandEntry = subst("&1,&2",
+                                          subst("&1/&2",cExpandEntry,"metric"),
+                                          subst("&1/&2",cExpandEntry,"imperial")
+                                          )  .
+                    end.
+                    mFlatExpand = StringUtil:AppendEntry(mFlatExpand, cExpandEntry).
+                end.
+                else
+                    mFlatExpand =  cExpand.   
+            end.               
         end.
      
         ExpandIsResolved = true.     
@@ -108,7 +124,7 @@ class Pmfo.Core.BusinessLogic.Parser.ExpandOptionsParser:
         define variable cReplaceLeft  as character no-undo. 
         define variable cReplaceRight as character no-undo. 
         define variable cReplaceComma as character no-undo. 
-         
+        
         define variable i as integer no-undo.
         define variable cExpand as character no-undo.
         define variable cExtract as character no-undo.
@@ -120,7 +136,10 @@ class Pmfo.Core.BusinessLogic.Parser.ExpandOptionsParser:
         define variable cExpandExpression as character no-undo.
         define variable cHideChars as character no-undo.
         define variable cReplaceHideChars as character no-undo.
-        
+        define variable lMeasurements as logical no-undo.
+        define variable cImperial     as character no-undo.
+        define variable cMetric       as character no-undo.
+        define variable cMeasureSelect as character no-undo. 
         do i = 1 to 4:
            if index(pcExpression,chr(i)) > 0 then  
                undo, throw new IllegalArgumentError(subst("character CHR(&1) found in Expand '&1'",i,pcExpression)).
@@ -154,17 +173,26 @@ class Pmfo.Core.BusinessLogic.Parser.ExpandOptionsParser:
         // loop through expand (comma separator) and then use left parethesis as entry param for the found entry to find the ines that have ab expression       
         do i = 1 to num-entries(cExpand):
             cExpandentry = entry(i,cExpand).
-            
+            lMeasurements = false.
+           
             /** Too late to check this as there already is bad UI code 
             if cExpandentry = "" then
                 undo, throw new IllegalArgumentError(subst("Expand '&1' has a leading, ending or double comma",pcExpression)).
             **/
-            
+              
             if cExpandentry > "" then
             do: 
                 if num-entries(cExpandentry,"(") > 1 then 
                 do:
                     cExpandEntity     = entry(1,cExpandentry,"(").
+                    // TODO make generic 
+                     
+                    if entry(num-entries(cExpandEntity,"/"),cExpandEntity,"/") = "measurements" then
+                    do:
+                        lMeasurements = true.
+                        cMetric = subst("&1/&2",cExpandEntity,"metric").
+                        cImperial = subst("&1/&2",cExpandEntity,"imperial").
+                    end.
                     // remove right parenthesis 
                     cExpandExpression = right-trim(entry(2,cExpandentry,"("),")").
                     
@@ -176,17 +204,52 @@ class Pmfo.Core.BusinessLogic.Parser.ExpandOptionsParser:
                     // also set back parenthesis and commas inside quotes as replaced on top of loop   
                     cExpandExpression = StringUtil:MaskCharInQuotes(cExpandExpression,cReplaceHideChars, cHideChars).
                     ExtractOptions(cExpandEntity,cExpandExpression).
+                    if lMeasurements then 
+                    do: 
+                        cMeasureSelect = ExpandSelects:get(cExpandEntity).
+                        ExpandSelects:remove(cExpandEntity).  
+                    end.    
                 end.
                 else 
                 do:
+                    // TODO make generioc
                     cExpandEntity = cExpandEntry.
+                    if entry(num-entries(cExpandEntity,"/"),cExpandEntity,"/") = "measurements" then
+                    do:
+                        lMeasurements = true.
+                        cMetric = subst("&1/&2",cExpandEntity,"metric").
+                        cImperial = subst("&1/&2",cExpandEntity,"imperial").
+                    end.    
                     cExpandExpression = "".  
-                end.     
-                
-                if lookup(cExpandEntity,mFlatExpand) > 0 then 
-                     undo, throw new IllegalArgumentError(subst("Entry '&1' in expand '&2' cannot be specifed more than once",cExpandentity,pcExpression)).
-                
-                mFlatExpand = left-trim(subst("&1,&2",mFlatExpand,cExpandEntity),",").
+                end. 
+                 
+                if lMeasurements  
+                and lookup(cMetric,mFlatExpand) = 0  
+                and lookup(cImperial,mFlatExpand) = 0 then
+                do:
+                    mFlatExpand = left-trim(
+                                         subst("&1,&2,&3",
+                                                mFlatExpand,
+                                                cMetric,
+                                                cImperial 
+                                                )
+                                         ,
+                                         ","
+                                        ).
+                  
+                    if cMeasureSelect > "" then 
+                    do:
+                        ExpandSelects:put(cMetric,cMeasureSelect).
+                        ExpandSelects:put(cImperial,cMeasureSelect).
+                    end.      
+                end.             
+                else do: 
+                    if lookup(cExpandEntity,mFlatExpand) > 0 then 
+                         undo, throw new IllegalArgumentError(subst("Entry '&1' in expand '&2' cannot be specifed more than once",cExpandentity,pcExpression)).
+                    
+                    mFlatExpand = left-trim(subst("&1,&2",mFlatExpand,cExpandEntity),",").
+                 
+                end.
             end.
                 
        end.     

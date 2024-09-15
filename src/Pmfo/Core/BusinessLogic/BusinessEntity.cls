@@ -130,11 +130,22 @@ using Pmfo.Core.Common.NamedArrayNameEnum from propath.
 using Ccs.BusinessLogic.JoinEnum from propath.
 using Pmfo.Core.BusinessLogic.RequestBuilder.FindManyRequestBuilder from propath.
 using Pmfo.Core.BusinessLogic.IValidateUpdateRequestPlugin from propath.
+using OpenEdge.BusinessLogic.QueryOperatorHelper from propath.
+using Pmfo.Core.BusinessLogic.IClientEntity from propath.
+using Pmfo.Core.BusinessLogic.UpdateDataResponse from propath.
+using Pmfo.Core.BusinessLogic.IUpdateDataResponse from propath.
+using Pmfo.Core.BusinessLogic.Delegate.ISubmitDelegate from propath.
+using Pmfo.Core.BusinessLogic.Delegate.ISubmitDelegator from propath.
+using Pmfo.Core.BusinessLogic.Delegate.IGetInternalDataDelegator from propath.
+using Pmfo.Core.BusinessLogic.Delegate.IGetInternalDataDelegate from propath.
+using Pmfo.Core.BusinessLogic.Delegate.IValidateDelegator from propath.
+using Pmfo.Core.BusinessLogic.Delegate.IValidateDelegate from propath.
  
-class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService implements IBusinessEntity, IFetchDelegator:
-    
-    
+class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService implements IBusinessEntity, IFetchDelegator, ISubmitDelegator, IGetInternalDataDelegator, IValidateDelegator:
+ 
     define public event DataReceived signature void (pParent as IBusinessEntity,pReceiveDataArgs as IReceiveDataEventArgs, phDataset as handle).
+    define public property IsDeprecated   as logical        no-undo get. protected set.   
+     
     
     define public property ClientOnly         as logical       no-undo get. protected set.
       
@@ -154,11 +165,18 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
                  undo, throw new IllegalStateError("LinkDataset must have the same serialize-name as the Datasets[1]").
              LinkDataset = hDataset.      
          end.
+    
     // not in interface and not really in use, but allowed -  see comments for GetKeys 
-    define public property Keys     as character no-undo 
+    // EdIt: since it is here - changed to pseudo constant( upper case) since it will never change while running  
+    //       used by subclass for minor performance benefit for frequent call cases
+    // public in IGetInternalDataDelegator
+    define public /** todo v12.7 final **/ property KEYS   as character no-undo 
         get():
-            return GetKeys().
+            if this-object:KEYS = "" then 
+               this-object:KEYS = GetKeys().
+            return this-object:KEYS.   
         end. 
+        private set.
     
     define public property WarningMessages    as IWarningMessages no-undo 
         get. 
@@ -189,16 +207,18 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
             Resource = pResource.   
         end.
     
-    define private property IsInfrastructureServiceStarted as logical no-undo get. set.
+    // not part of IBE - public for ISubmitDelegator 
+    define public property IsInfrastructureServiceStarted as logical no-undo get. set.
   
-    define protected property InfrastructureService as IInfrastructureService no-undo
+    // not part of IBE - public for ISubmitDelegator 
+    define public property InfrastructureService as IInfrastructureService no-undo
         get ():
             // the application service manager is expected to manage and cache it so don't cache it here 
             // there is currently no service for this in Pmfo   
             InfrastructureService = cast(Application:ServiceManager:getService(get-class(IInfrastructureService)),IInfrastructureService).
             return InfrastructureService.
         end.    
-        set (pService as IInfrastructureService):
+        protected set (pService as IInfrastructureService):
             IsInfrastructureServiceStarted = valid-object(pservice).
             InfrastructureService = pService. 
         end.      
@@ -243,6 +263,11 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
     
     define public  property InheritsResource    as character  no-undo get. protected set.
     
+    define protected property SubmitDelegate  as ISubmitDelegate  no-undo 
+        get():
+            return cast(cast(Application:ServiceManager,IServiceManager):getService(get-class(ISubmitDelegate)),ISubmitDelegate).
+        end. 
+    
     define protected property FetchDelegate  as IFetchDelegate  no-undo 
         get():
             return cast(cast(Application:ServiceManager,IServiceManager):getService(get-class(IFetchDelegate)),IFetchDelegate).
@@ -253,6 +278,23 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
             return cast(cast(Application:ServiceManager,IServiceManager):getService(get-class(IFetchFunctionDelegate)),IFetchFunctionDelegate).
         end.     
     
+    define protected property GetInternalDataDelegate  as IGetInternalDataDelegate no-undo 
+        get():
+            return cast(cast(Application:ServiceManager,IServiceManager):getService(get-class(IGetInternalDataDelegate)),IGetInternalDataDelegate).
+        end.     
+    
+    // the ValidateDelegate public APIs expects this-object to be IBusinessEntityDelegator inherited by IBusinessEntity
+    // it will call field validatioh if the BE is IValidateDelegator (which it is...)
+    // Not sure of it makes sense... but the reason is that some methods calls the child BE and 
+    // to avoid cast for the main validation the IBusinessEntityDelegator whihc is kind of the base for all delegators
+    // is defined in the IBusinessEntity interface 
+    // The field by field validation NOT FieldValidationService is not used a lot so is not added to IBusinessEntityDelegator     
+    define protected property ValidateDelegate as IValidateDelegate  no-undo 
+        get():
+            return cast(cast(Application:ServiceManager,IServiceManager):getService(get-class(IValidateDelegate)),IValidateDelegate).
+        end.   
+    
+    define protected property Initialized  as logical no-undo get. private set.
     
     define private variable mFunctionsCreated   as logical no-undo.
     define private variable mActionsCreated     as logical no-undo.
@@ -370,11 +412,13 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
                 return false.
         end.
     
-    // for IFetchDelegator NOT currently in IBusinessEntity (Can be added since Datasets is public )  
      define public property DefaultDataset as handle no-undo 
         get():
-            return Datasets[1].
+            if extent(Datasets) <> ? then
+                return Datasets[1].
+            return ?.    
         end. 
+        protected set.
     
     define protected property Questions as IList no-undo
         get().
@@ -382,7 +426,7 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
                 this-object:Questions = new List().
             return Questions.
         end.
-        protected set.
+        protected set. // needed for 12.2
     
     define protected property DataAccess as IDataAccess no-undo 
         get():
@@ -413,8 +457,10 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
         
     define public property ReadOnly  as logical   no-undo init ?   
         get().  
-            if ReadOnly = ? then do: 
-                if DatasetUtil:GetNumTopBuffers(DefaultDataset) = 1 then
+            if ReadOnly = ? then 
+            do: 
+                if valid-handle(DefaultDataset)  
+                and DatasetUtil:GetNumTopBuffers(DefaultDataset) = 1 then
                     ReadOnly = not valid-handle(DefaultDataset:get-top-buffer(1):table-handle:before-table).
                 else     
                     ReadOnly = true.
@@ -471,12 +517,16 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
             CanRead = plCanRead.
         end.    
     
+   
     define protected property CreateOnlyFields       as character no-undo get. set.
     define protected property ReadOnlyFields         as character no-undo get. set.
-    define protected property ValidateRequiredFields as logical   get. set.
-    define protected property ServerFields           as character get. set. // allow ? on client - used for keys and create date and such 
-    // use for fields that have init ? to enforce a value from UI (otherwise init ? bypasses ValidateRequiredFields) 
-    define protected property RequiredFields         as character no-undo get. set.
+   
+    // public for IValidateDelegator
+    define public property ValidateRequiredFields as logical   get. set.
+     // public for IValidateDelegator
+    define public property ServerFields           as character get. set. // allow ? on client - used for keys and create date and such 
+    // public for IValidateDelegator - use for fields that have init ? to enforce a value from UI (otherwise init ? bypasses ValidateRequiredFields) 
+    define public property RequiredFields         as character no-undo get. set.
      
     
     // avoid memory leak by keeping only one requested dynamic dataset (set in GetRequestDataset) 
@@ -564,17 +614,16 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
     **/     
     
     method public character GetKeys():
-        if DatasetUtil:GetNumTopBuffers(Datasets[1]) = 1 then 
+        if extent(Datasets) <> ? and DatasetUtil:GetNumTopBuffers(Datasets[1]) = 1 then 
             return BufferUtil:GetInternalKeys(Datasets[1]:get-buffer-handle(1)).
         return ?.     
     end.     
     
    method public character GetPublicKeys():
        define variable cKeys as character no-undo.
-       if DatasetUtil:GetNumTopBuffers(Datasets[1]) = 1 then 
+       if extent(Datasets) <> ? and DatasetUtil:GetNumTopBuffers(Datasets[1]) = 1 then 
        do: 
            cKeys = GetKeys().
-        
            return BufferUtil:GetPublicFieldNames(Datasets[1]:get-buffer-handle(1), cKeys).
        end.
        return ?.    
@@ -586,7 +635,7 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
         define variable cTextFieldIdx as character extent no-undo.
         define variable hbuffer as handle no-undo.
         
-        if DatasetUtil:GetNumTopBuffers(Datasets[1]) = 1 then 
+        if extent(Datasets) <> ? and DatasetUtil:GetNumTopBuffers(Datasets[1]) = 1 then 
         do:
             hBuffer = Datasets[1]:get-buffer-handle(1).      
             hFld = hBuffer:buffer-field("name") no-error.
@@ -639,6 +688,11 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
     method protected IDatasetUpdateManager GetDatasetUpdateManager(pScope as ILifecycleScope):
         return cast(cast(Application:ServiceManager,IServiceManager):getService(get-class(IDatasetUpdateManager),pScope),IDatasetUpdateManager).
     end method.
+    
+    // dynamic create on the fly BEs only know resource name
+    constructor protected BusinessEntity (pcResource as character):
+        Resource = pcResource.
+    end method.    
     
     /**
     Constructor that defined resource name for an entity with more than two top-buffers in a single dataset
@@ -799,7 +853,7 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
             oFindService:AssertFind(oRelation:name,oQueryentry).
             catch eNotFound as TableNotFoundError:
                 if phbuffer:row-state = row-modified or phbuffer:row-state = row-created then 
-                   ThrowBufferError(phbuffer, eNotFound:GetStrippedMessage(),"").
+                   ThrowBufferError(phbuffer, eNotFound:GetStrippedMessage()).
                 else   
                    undo, throw new BadRequestError(eNotFound:GetStrippedMessage()).    
             end catch. 
@@ -835,17 +889,9 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
     
     
     method protected void FillChildRows(phBuffer as handle, pcChild as character, phDataset as handle):
-        define variable hChildBuffer    as handle no-undo.
-        define variable hChildTable     as handle no-undo.
-        define variable oBe             as IBusinessEntity no-undo.
-        define variable oDatasetManager as IDatasetUpdateManager no-undo.
         define variable oRelation       as IRelation no-undo.
-        define variable oTableRequest   as Pmfo.Core.BusinessLogic.IGetDataTableRequest no-undo.
-        
-        Assert:NotNull(phDataset, "dataset").
-        
-        hChildBuffer = DatasetUtil:GetBufferBySerializeName(phDataset,pcChild).
         oRelation    = GetLink(pcChild).
+        
         if not valid-object(oRelation) then 
             undo, throw new IllegalArgumentError(subst("No Link found for '&1'",pcChild)).
         
@@ -858,20 +904,7 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
         if oRelation:Cardinality = RelationTypeEnum:ManyToOne then 
             undo, throw new IllegalArgumentError(subst("Relation &1 is a many to one relation",pcChild)).
         
-        if valid-handle(hChildBuffer) then
-        do: 
-            hChildTable = hChildBuffer:table-handle.
-         //   if hChildTable:has-records then
-           //     undo,throw new UnsupportedOperationError(subst("FetchChildTable for '&1' with data",hChildTable:name)).       
-            
-            oDatasetManager = GetDatasetUpdateManager(phDataset).
-            oBe             = oDatasetManager:GetBusinessEntity(hChildBuffer).            
-            oTableRequest   = new GetDataTableRequest(hChildTable:name).
-            oTableRequest:AddQueryEntry(RelationQuery(phBuffer,oRelation)).  
-            oBe:GetData(oTableRequest, output table-handle hChildTable append).
-        end.
-        else 
-            undo,throw new IllegalArgumentError(subst("Buffer with serialize-name '&1' not found in dataset",hChildTable:name)).       
+        FillChildRows(RelationQuery(phBuffer,oRelation), pcChild, phDataset).
     end method.
     
     method protected IQueryEntry RelationQuery(phBuffer as handle,pRelation as IRelation):
@@ -1130,7 +1163,9 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
     method protected IRelation AddLink(pcRelatedResource as character,pcParentFieldNames as character extent,pcChildFieldnames as character extent, pCardinality as RelationTypeEnum):
         define variable oRelation as IRelation no-undo.
         AssertDefaultDatasetTopBufferSameName().
+        
         AssertLink(Datasets[1]:serialize-name,pcRelatedResource,pcParentFieldNames).
+        
         oRelation = new Relation(Datasets[1]:serialize-name,pcRelatedResource,pcParentFieldNames,pcChildFieldnames,pCardinality).
         AddLink(oRelation). 
         return oRelation.
@@ -1194,14 +1229,14 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
     method protected IDatasetRelation AddLink(phRelation as handle, pcDisableWebMethods as char extent, pCardinality as RelationTypeEnum):
         define variable oRelation as IDatasetRelation no-undo.
         oRelation = new DatasetRelation(phRelation,pcDisableWebMethods,pCardinality).
-         AddLink(oRelation).
+        AddLink(oRelation).
         return oRelation.      
     end method.
     
     method protected IDatasetRelation AddLink(phRelation as handle, poMethod as IMethod):
         define variable oRelation as IDatasetRelation no-undo.
         oRelation = new DatasetRelation(phRelation,poMethod).
-         AddLink(oRelation).
+        AddLink(oRelation).
         return oRelation.       
     end method.
     
@@ -1225,7 +1260,6 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
         Links:Add(oRelation). 
         return oRelation.       
     end method.
-    
     
     method protected IDatasetRelation AddLink(phRelation as handle, poMethod as IMethod,pcDisableWebMethod as char):
         define variable oRelation as IDatasetRelation no-undo.
@@ -1256,12 +1290,20 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
     end method.
     
     method protected void AssertDefaultDatasetTopBufferSameName():
-        if Datasets[1]:serialize-name <> DatasetUtil:GetTopBuffer(Datasets[1], 1):serialize-name then
-             undo, throw new IllegalOperationError(subst("Dataset[1] serialize-name '&1' does not have a single top buffer with same serialize-name. Top buffer serialize-name '&2'",
-                                                   Datasets[1]:serialize-name,
-                                                   DatasetUtil:GetTopBuffer(Datasets[1], 1):serialize-name      
-                                                         )
-                                                   ). 
+        // todo - check for type or class that has lazy load of defs
+        if extent(Datasets) <> ? then
+        do:
+            if Datasets[1]:serialize-name <> DatasetUtil:GetTopBuffer(Datasets[1], 1):serialize-name then
+                 undo, throw new IllegalOperationError(subst("Dataset[1] serialize-name '&1' does not have a single top buffer with same serialize-name. Top buffer serialize-name '&2'",
+                                                       Datasets[1]:serialize-name,
+                                                       DatasetUtil:GetTopBuffer(Datasets[1], 1):serialize-name      
+                                                             )
+                                                       ). 
+        end.
+        else do: 
+            message "this-object" this-object
+            view-as alert-box.
+        end.                                               
     end method.
     
     method protected handle GetAndAssertRelationParent(pcParent as char):
@@ -1313,15 +1355,41 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
     method protected IBusinessEntity GetBusinessEntityForDataset(phDataset as handle, pcResource as character):
         define variable oDatasetManager   as IDatasetUpdateManager no-undo.
         define variable hBuffer           as handle no-undo.
-        oDatasetManager = GetDatasetUpdateManager(phDataset).
         hBuffer = DatasetUtil:GetBufferByTableSerializeName(phDataset, pcResource).
-        return oDatasetManager:GetBusinessEntity(hBuffer).  
+        if not valid-handle(hBuffer) then 
+             undo, throw new IllegalArgumentError(subst("No buffer in dataset matches the resource '&1'",pcResource)). 
+        
+        oDatasetManager = GetExistingDatasetUpdateManager(phDataset).
+        if valid-object(oDatasetManager) then 
+            return oDatasetManager:GetBusinessEntity(hBuffer).
+            
     end method.    
     
     method protected IBusinessEntity GetBusinessEntityForDataset(phBuffer as handle):
         define variable oDatasetManager   as IDatasetUpdateManager no-undo.
-        oDatasetManager = GetDatasetUpdateManager(phBuffer:dataset).
-        return oDatasetManager:GetBusinessEntity(phBuffer).  
+        if not valid-handle(phBuffer) then 
+             undo, throw new IllegalArgumentError("Invalid buffer handle").
+        
+        oDatasetManager = GetExistingDatasetUpdateManager(phBuffer:dataset).
+        if valid-object(oDatasetManager) then 
+            return oDatasetManager:GetBusinessEntity(phBuffer).
+     
+    end method.    
+    
+    // safer version to use when it must exist in the manager 
+    method protected IBusinessEntity GetCurrentBusinessEntityForDataset(phDataset as handle, pcResource as character):
+        define variable oDatasetManager   as IDatasetUpdateManager no-undo.
+        define variable hBuffer           as handle no-undo.
+        define variable oBe               as IBusinessEntity no-undo.
+        oDatasetManager = GetDatasetUpdateManager(phDataset).
+        hBuffer = DatasetUtil:GetBufferByTableSerializeName(phDataset, pcResource).
+        if not valid-handle(hBuffer) then 
+            undo, throw new IllegalArgumentError(subst("No buffer in dataset matches the resource '&1'",pcResource)).
+              
+        oBe = oDatasetManager:GetStartedBusinessEntity(hBuffer).
+        if not valid-object(oBE) then 
+            undo, throw new IllegalStateError(subst("Business Entity '&1' is not present in the DatasetUpdateManager",pcResource)).
+        return oBE.
     end method.    
     
     // use to fill the BE when the tt or ds is not needed immediately/directly
@@ -1332,7 +1400,7 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
     end method.
     
     // use to fill the BE when the tt or ds is not needed immediately/directly
-    method protected logical GetData( input pQueryEntry as IQueryEntry):
+    method public logical GetData( input pQueryEntry as IQueryEntry):
         define variable oTableRequest as Pmfo.Core.BusinessLogic.IGetDataTableRequest no-undo.
         define variable oRequest as Pmfo.Core.BusinessLogic.IGetDataRequest  no-undo.
         oTableRequest = new GetDataTableRequest(Datasets[1]:get-buffer-handle(1):table-handle:name).
@@ -1468,6 +1536,40 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
         return oResponse.       
     end method.      
     
+    method public logical GetData(  output table-handle phTable):
+        define variable hNewDataset     as handle no-undo.
+           
+        if DefaultDataset:num-top-buffers > 1 then 
+            undo, throw new IllegalArgumentError(subst("Request to GetData(output table-handle) in Resource &1 that has more than one top buffer in the default dataset",Resource)).
+         
+        if valid-handle(phTable) = false 
+        or phTable = DefaultDataset:get-top-buffer (1):table-handle then
+        do: 
+            GetData(output dataset-handle DefaultDataset by-reference).
+            if not valid-handle(phTable) then 
+                phTable = DefaultDataset:get-top-buffer (1):table-handle.
+        end.    
+        else do:    
+            if phTable:serialize-name = Resource
+            or phTable:name = DefaultDataset:get-top-buffer (1):table-handle:name then
+            do on error undo, throw: 
+                create dataset hNewDataset.
+                hNewDataset:serialize-name = Resource.
+                hNewDataset:add-buffer(phTable:default-buffer-handle).
+                GetData(output dataset-handle hNewDataset by-reference).
+                finally:
+                    if valid-handle(hNewDataset) then 
+                         delete object hNewDataset.    
+                end finally.
+            end.
+            else
+                undo, throw new IllegalArgumentError(subst("Request to GetData(output table-handle &1) in Resource '&2'",phTable:name, Resource)).
+       
+        end.
+        return true. //  we throw error for all unsupported cases    
+        
+    end method.     
+    
     method public Pmfo.Core.BusinessLogic.IGetDataResponse GetData(  output dataset-handle phDataset ):
         define variable oRequest as Pmfo.Core.BusinessLogic.IGetDataRequest no-undo.
         define variable oResponse as Pmfo.Core.BusinessLogic.IGetDataResponse no-undo. 
@@ -1493,8 +1595,6 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
         return oResponse.
     end method. 
     
-     
-  
     method public final Object GetData( input poRequest as Pmfo.Core.BusinessLogic.IGetDataRequest, input dataset-handle phDataset ):
         define variable oGetResponse     as Pmfo.Core.BusinessLogic.IGetDataResponse no-undo.
         define variable oMethod          as Method no-undo.
@@ -1504,6 +1604,7 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
         define variable oObject          as Object no-undo.
         define variable cFunctionName    as character no-undo.
         oDatasetManager = PrepareFetch(poRequest, output oScope, input-output phDataset).
+        
         oMethod = poRequest:GetClientMethod(this-object, phDataset, output oParameterList).
        
         if valid-object(oMethod) then
@@ -1555,7 +1656,12 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
                 cFunctionName =  poRequest:NamedQuery:name .
             else 
             do: 
-                cFunctionName = cast(poRequest:GetTableRequest(phDataset:get-buffer-handle(1)),Pmfo.Core.BusinessLogic.IGetDataTableRequest):NamedQuery:name.     
+                if valid-object(cast(poRequest:GetTableRequest(Datasets[1]:get-buffer-handle(1):name),Pmfo.Core.BusinessLogic.IGetDataTableRequest):NamedQuery) then
+                    cFunctionName = cast(poRequest:GetTableRequest(Datasets[1]:get-buffer-handle(1):name),Pmfo.Core.BusinessLogic.IGetDataTableRequest):NamedQuery:name.
+                else do:
+                    // not likely 
+                    cFunctionName = "<unknown>".
+                end.             
             end.
             undo, throw new IllegalStateError(subst("The primitive &1/&2 public function is defined, but the physcial method was not found. Primitive functions must be implemented in the Business Entity.",
                                                      Resource,
@@ -1586,11 +1692,11 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
         define variable cClientInnerJoins    as character no-undo.
         define variable oClientSort          as IQuerySortEntry extent no-undo.
         define variable oIter                as IIterator no-undo.
-        
+        define variable cMsg                 as character no-undo.
         oDatasetManager = PrepareFetch(poRequest, output oScope, input-output phDataset).
         cClientInnerJoins = oDatasetManager:ClientInnerJoinTables.
         oClientSort       = oDatasetManager:ClientSort. 
-        
+       
         oMethod = poRequest:GetClientMethod(this-object, phDataset, output oParameterList).
          
         if valid-object(oMethod) then
@@ -1627,6 +1733,19 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
         
         if valid-object(oGetResponse) = false then
         do:
+            if valid-object(oMethod) and ClientOnly then 
+            do:
+                // this should ideally throw an error, but there may be existing code with this problem
+                cMsg = subst("Function &1 in client only resource &2 is attempted submitted to the Data Access.The intended request is likely already executed and while the call will not reach the server there could be undesired consequences since some post request events will fire. It is adviced that the &1 Method is changed to return a GetDataResponse to avoid this unnecessary call.",
+                             oMethod:name,
+                             this-object:GetClass():TypeName).
+                if session:remote then
+                    message cMsg.
+                else 
+                    message cMsg
+                    view-as alert-box warning.
+                 
+            end.       
             oGetResponse = FetchData(poRequest, input-output dataset-handle phdataset by-reference). 
         end.
         else if oGetResponse:RequestComplete = false then
@@ -1971,6 +2090,15 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
         return cMsg.
     end method.
     
+    method public void AssertCurrentSelf(phBuffer as handle, pcFields as char):
+        define variable cDummy as character no-undo.
+        CompareAndRefreshCurrentSelf(phBuffer,"", pcFields, output cDummy).
+    end method.
+    
+    method public logical CompareAndRefreshCurrentSelf(phBuffer as handle, pcRefreshFields as char, pcTooLateFields as char, output pcRefreshInfo as character):
+        return GetInternalDataDelegate:CompareAndRefreshCurrentSelf(this-object, phBuffer, pcRefreshFields, pcTooLateFields, output pcRefreshInfo).
+    end method.
+    
     method protected character extent GetMethodNames(pMethods as IMethod extent):
         define variable cNames as character extent no-undo.
         define variable i as integer no-undo.
@@ -2149,9 +2277,9 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
     method public Object UpdateData( input-output dataset-handle phDataset, input poUpdateDataRequest as IUpdateDataRequest ):
         
         define variable oResponse as Object no-undo.
+        define variable oUpdateResponse as IUpdateDataResponse no-undo.
         define variable hWarning   as handle no-undo.
         
-        define variable oGetRequest as Pmfo.Core.BusinessLogic.IGetDataRequest no-undo.
         define variable lError as logical no-undo.
         define variable oReceiveError as Error no-undo.
         define variable oError as Error no-undo.
@@ -2160,10 +2288,11 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
         define variable oDatasetManager  as IDatasetUpdateManager no-undo.
         define variable oScope as LifecycleScope no-undo.
         define variable oValidateRequestPlugin as IValidateUpdateRequestPlugin no-undo.
-            
+        define variable cActionWarning as character no-undo.    
+        define variable cActionWarningLog as character no-undo.    
         Assert:NotNull(phdataset,"Dataset passed to UpdateData").
         Assert:NotNull(poUpdateDataRequest,"UpdateDataRequest passed to UpdateData").
-     
+        
         AllDataIsFetched = false. // as for now any update is assumed to mess with the concept of having all data  
         SuccessMessages = ?. // will be lazy loaded if referenced 
         WarningMessages = new WarningMessages(phdataset). // needs dataset for conversion of field names to public names  
@@ -2208,10 +2337,25 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
                     end catch.                  
                 end.
             end.
-            /* to hook into the events for read after the update we need a get request -  
-               we fire these also when error 
-            */   
-            oGetRequest = CreateGetRequestForRefresh(poUpdateDataRequest,phDataset).
+            else do:
+                if cast(poUpdateDataRequest:CustomRequest,IAction):IsDeprecated then
+                do:
+                    cActionWarning = subst("The &1 &2 is marked as deprecated. It still works but should be replaced by IT.",
+                               this-object:Resource,
+                               cast(poUpdateDataRequest:CustomRequest,IAction):name
+                              ).
+                    cActionWarningLog = subst("The &1 &2 is marked as deprecated. &2. &3",
+                                               this-object:Resource,
+                                               cast(poUpdateDataRequest:CustomRequest,IAction):name,
+                                               if cast(poUpdateDataRequest:CustomRequest,IAction):DeprecatedWarning > ""                                                
+                                               then cast(poUpdateDataRequest:CustomRequest,IAction):DeprecatedWarning
+                                               else "It still works.",
+                                               if cast(poUpdateDataRequest:CustomRequest,IAction):DeprecatedRemoveCallInfo > ""                                                
+                                               then cast(poUpdateDataRequest:CustomRequest,IAction):DeprecatedRemoveCallInfo
+                                               else "It should be replaced/eliminated."
+                                              ).
+                end.    
+            end.           
             if not phDataset:error then
             do: 
                 oMethod = poUpdateDataRequest:GetClientMethod(this-object, phDataset, output oParameterList).
@@ -2237,17 +2381,19 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
                 end.
                 else do:
                     oResponse = SubmitData(poUpdateDataRequest, input-output dataset-handle phDataset by-reference).
-                end.    
-                if valid-object(oResponse) and type-of(oResponse,String) then
-                do:
-                    // bug worksround - cannot detect error in if caller is by-reference (need more research) 
-                    if cast(oResponse,String):Value = "error" then
+                    
+                    // Need research on how to manage dataset error to the by-reference 
+                    // from the return from DataAccess input-output deep copy ) - bug?
+                    // This is a workaround in the DataAccess  
+                    if valid-object(oResponse) and type-of(oResponse,String) then
                     do:
-                         phDataset:error = true.
-                         lError = true.
-                    end.   
-                end.
-                
+                        if cast(oResponse,String):Value = "error" then
+                        do:
+                            phDataset:error = true.
+                            lError = true.
+                        end.   
+                    end.
+                end.    
             end.
             else 
                 lError = true.
@@ -2257,10 +2403,7 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
             end catch.
         end.       
         do on error undo, throw:
-         
-            // this is called also after an error, but if an error occurs here it will be ignored
-            // since lError will be prioritized belew 
-            ReceiveData(new ReceiveDataEventArgs(oGetRequest,new GetDataResponse(),lError),phDataset).
+            RefreshData(poUpdateDataRequest,phDataset,lError).
             catch e2 as Progress.Lang.Error :
                 oReceiveError = e2.
             end catch.
@@ -2269,7 +2412,6 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
         if valid-object(oError) then
             undo, throw oError.
         
-       
         if phDataset:error then  
             ThrowDatasetError(phDataset).
         
@@ -2282,18 +2424,38 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
              // add child warnings to the warning table 
             
             oDatasetManager:GetChildWarnings(output table-handle hWarning append). 
+            
             if valid-object(poUpdateDataRequest:CustomRequest)
-            and type-of(poUpdateDataRequest:CustomRequest,IAction) 
-            and valid-object(cast(poUpdateDataRequest:CustomRequest,IAction):SuccessRowState) then
-            do:
-                PrepareSuccessMessages(cast(poUpdateDataRequest:CustomRequest,IAction),poUpdateDataRequest:MainRequestedBuffer, phDataset).          
+            and type-of(poUpdateDataRequest:CustomRequest,IAction) then 
+            do: 
+                if valid-object(cast(poUpdateDataRequest:CustomRequest,IAction):SuccessRowState) then
+                    PrepareSuccessMessages(cast(poUpdateDataRequest:CustomRequest,IAction),poUpdateDataRequest:MainRequestedBuffer, phDataset).          
+                if cActionWarning > "" then
+                    AddDeprecatedWarningAndLog(cActionWarning,cActionWarningLog).
             end. 
         end.   
         
-        return oResponse.        
+        if poUpdateDataRequest:Messages:size > 0 then
+        do:
+            oUpdateResponse = new UpdateDataResponse().
+            oUpdateResponse:Messages:AddAll(poUpdateDataRequest:Messages).
+            return oUpdateResponse. 
+        end.     
+        else
+            return oResponse.        
         
         finally:
             cast(Application:ServiceManager,IServiceManager):stopServices(oScope,get-class(IDatasetUpdateManager)). 
+           
+            // the updaterequest may have been added to the client parameter list to an action in which case
+            // we need to clean up to ensure the UpdateDataRequest (and Action) is GBC later
+            if valid-object(poUpdateDataRequest) then 
+                poUpdateDataRequest:RemoveClientMethod().
+          //  message "deletiong" InfrastructureService
+           // view-as alert-box.
+            delete object InfrastructureService no-error.
+            isInfrastructureServiceStarted = false.
+               
         end finally.     
     end method.
     
@@ -2347,129 +2509,25 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
     // separated out so that BE actions can call it without dealing with managing warnings  
     // final - this is absolutely not overridable - it is the single entry point for BE to DA  
     method protected final Object SubmitData( input poUpdateDataRequest as IUpdateDataRequest, input-output dataset-handle phDataset):
-        define variable oReturn    as Object no-undo.
-        define variable hWarning   as handle no-undo.
-        define variable hRelation  as handle no-undo.
-        define variable iRel       as integer no-undo.
-        define variable iBuffer    as integer no-undo.
-        define variable hBuffer    as handle no-undo.
-        define variable cNavTables as character no-undo.
-        define variable oBe        as IBusinessEntity no-undo.
-        define variable hInfrastructureDataset as handle no-undo.
-        define variable oDatasetUpdateManager as IDatasetUpdateManager no-undo.
-       
-        // Use of BufferError outside managed hooks may end here if not managed  
-        // (this is considered part of the framework, as it allows BufferError to be used also outside of 
-        // the validate hooks
-        if phDataset:error then
-            ThrowDatasetError(phDataset).
-
-        // do not start DS for inactive relations ir clientonly children
-        // TODO - check recursive (difficult when non active) ?  
-        do iRel = 1 to phDataset:num-relations:
-            hRelation = phDataset:get-relation(IRel).
-            if hRelation:active = false then 
-                poUpdateDataRequest:AddNoTargetTable(hRelation:child-buffer:table-handle:name).
-            else do:
-                // et existing - we do not want to start the manager if this is not called from UpdateData (wil cause a leak)
-                oDatasetUpdateManager = GetExistingDatasetUpdateManager(phDataset).
-                if valid-object(oDatasetUpdateManager) then 
-                    // GetBusinessEntity upresses not found from Service if the be is not in its cache and does not exist
-                    oBe = oDatasetUpdateManager:GetBusinessEntity(hRelation:child-buffer).
-                else do on error undo, throw:
-                    oBe = cast(Application:ServiceManager,IServiceManager):CreateBusinessEntity(hRelation:child-buffer:table-handle:serialize-name).
-                    catch e as NotFoundError :
-                      // this is not considered an error in this case 
-                      // there may be tempt tables that does not have a BE     
-                    end catch.
-                end.      
-                if valid-object(oBe) and oBe:ClientOnly then 
-                    poUpdateDataRequest:AddNoTargetTable(hRelation:child-buffer:table-handle:name).
-            end.         
-        end.
-          
-        if valid-object(poUpdateDataRequest:Action) = false then 
-        do:  
-            if poUpdateDataRequest:MainRequestedBuffer > "" then 
-            do :
-                hBuffer = phDataset:get-buffer-handle (poUpdateDataRequest:MainRequestedBuffer).
-                // get nav tables (URL parent references with no data in the body ) 
-                // as we do not want to check id current on server
-                // (may not have all data)
-                // don't throw error (for now?) if not valid  
-                if valid-handle(hBuffer) then 
-                    cNavTables = DatasetUtil:GetParentTableNames(hBuffer). 
-            end.
-            // add read-only tables to update request list of tables to check are current. 
-            // If fhey are part of the submit they are very likely important and need to be current  
-            do iBuffer = 1 to phDataset:num-buffers:
-                hBuffer = phDataset:get-buffer-handle(iBuffer).
-                if valid-handle(hBuffer:before-buffer) 
-                and hBuffer:table-handle:has-records
-                and hBuffer:before-buffer:table-handle:has-records = false 
-                and lookup(hBuffer:table-handle:name,cNavTables) = 0 then 
-                    poUpdateDataRequest:AddCheckReadOnlyTable(hBuffer:table-handle:name).
-            end.
-        end. 
-        
-        if valid-object(WarningMessages) then
-            hWarning = cast(WarningMessages,IWarningMessageTableHolder):TableHandle.
-       
-        if IsInfrastructureServiceStarted then 
-            hInfrastructureDataset = InfrastructureService:dataset.
-        
-        oReturn = DataAccess:SubmitData(poUpdateDataRequest, input-output dataset-handle phDataset, input dataset-handle hInfrastructureDataset, output table-handle hWarning append).        
-        
-        return oReturn.
-        
-        finally:
-            if IsInfrastructureServiceStarted then 
-                delete object InfrastructureService.
+         
+        return SubmitDelegate:SubmitData(this-object, 
+                                    GetExistingDatasetUpdateManager(phDataset), 
+                                    DataAccess, 
+                                    poUpdateDataRequest, 
+                                    input-output dataset-handle phDataset by-reference ).
                     
-        end finally.
-         
-         
     end method. 
     
-    method public void ThrowDatasetError( phDataset as handle): 
-        define variable oJson as JsonObject no-undo.
-        define variable oErrorProcessor as JsonDatasetErrorProcessor no-undo.
-        define variable oError as Error no-undo.
-        define variable iRelation as integer no-undo.
-        
-        oJson = new JsonObject().
-        do iRelation = 1 to phDataset:num-relations:
-            // ensure keys are in json so they can be added to error 
-            // as of current the dataset is not returne for errors 
-            // we may return datasets for 409 in futrure , but the assumption is that it causes no isses since it will always be correct 
-            // TODO  use parent relation  
-            phDataset:get-relation (iRelation):foreign-key-hidden = false.
-        end.       
-        phDataset:write-json ("JsonObject",oJson,no,?,no,yes, yes).
-        oErrorProcessor = new JsonDatasetErrorProcessor().
-            
-        if DatasetUtil:HasBeforeState(phDataset,row-deleted) then 
-            oError = oErrorProcessor:CreateDeleteError (ojson, phdataset).
-        else 
-            oError = oErrorProcessor:CreateError (ojson, phdataset).
-        
-        if valid-object(oError) then
-        do:
-            undo, throw oError .
-        end.
-        else do:
-            // this should no longer happen since JsonDatasetErrorProcessor now should manage all cases that ended up here before  
-            oError = new ApplicationError("Update of data failed, but no error information was returned to the client. Please Contact IT.").
-            undo, throw oError. 
-        end.   
+    method public final void ThrowDatasetError( phDataset as handle): 
+        SubmitDelegate:ThrowDatasetError(phDataset).
     end method.    
     
     method protected IUpdateDataRequest CreateUpdateDataRequest(pClientRequest as IClientRequest,pMainRequestedBuffer as handle,pRequestType as RequestTypeEnum):
-         define variable cConfirmations as character no-undo.
-         if type-of(pClientRequest,IClientUpdateRequest) then 
-             cConfirmations = cast(pClientRequest,IClientUpdateRequest):Confirmations.
+        define variable cConfirmations as character no-undo.
+        if type-of(pClientRequest,IClientUpdateRequest) then 
+            cConfirmations = cast(pClientRequest,IClientUpdateRequest):Confirmations.
              
-         return new UpdateDataRequest(pMainRequestedBuffer:name,pRequestType,cConfirmations).
+        return new UpdateDataRequest(pMainRequestedBuffer:name,pRequestType,cConfirmations).
     end method.    
     
     // default update request for dataset 
@@ -2497,6 +2555,13 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
     
     method override public void Initialize(  ): 
         define variable oFunction as IFunction no-undo.
+        // we allow some BEs to run without initialization for
+        // internal data retrival of the main table only 
+        // specifically for FindService, but may be extended for other cases in the future
+        // In that case when this variable is false methods that requires intitialization
+        // must throw error or invoke initialize 
+        //  
+        Initialized = true. 
         oFunction = Addfunction("Count").
         oFunction:IsPrimitive = true.
         oFunction:Binding = MethodBindingEnum:Collection.
@@ -2600,49 +2665,79 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
          this-object:DataReceived:publish (this-object,pReceiveDataArgs, phDataset).
     end method.
     
-    // IFetchDelegator - NOT in IBusinessEntity
+    // called from BE UpdateData
+    // - final the ReceiveDataEventArgs should have info for whatever need to be done
+    //   1 if more is needed add a overridable method for creation of the ReceiveDataEventArgs
+    //   1a. W may remove final as ReceiveDataEventArgs may no reach far enough.. 
+    //     this was mainly impmented (extracted from UpdateData) to allow ClientUpdateRequest to detect that 
+    //     refresh is from update to prevent already exists error since they create records to fulfill a 
+    //     GetRequest. The clientBusinessEntity has a BeforeReceiveData hook with the ReceiveDataEventArgs as parameter
+    //   2. Override may not be what you want if you really need to reach some of child BEs...           
+    method protected final void RefreshData(poUpdateRequest as IUpdateDataRequest, phDataset as handle, plUpdateError as logical):
+        define variable oGetRequest as Pmfo.Core.BusinessLogic.IGetDataRequest no-undo.
+        oGetRequest = CreateGetRequestForRefresh(poUpdateRequest,phDataset).
+        // this is called also after an error, but if an error occurs here it will only cause a warning 
+        // the lError passed in is just for information to the event  
+        // we use ReceiveDataEventArgs constructor that has parameter for the update 
+        ReceiveData(new ReceiveDataEventArgs(oGetRequest, 
+                                             new GetDataResponse(),
+                                             poUpdateRequest,
+                                             plUpdateError),
+                                             phDataset).
+    end method. 
+    
+    // IFetchDelegator - NOT in IBusinessEntity - firtes only in top level BE that manages the request dataset 
     method public final void ReceiveData(pReceiveDataArgs as IReceiveDataEventArgs, phDataset as handle):
-        ReceiveData(?, pReceiveDataArgs, phDataset). 
+        ReceiveData(?, pReceiveDataArgs, phDataset).
+        if pReceiveDataArgs:Failed = false then
+            PostReceiveDataset(pReceiveDataArgs:Request, phDataset).  
     end method.  
     
-    // IFetchDelegator - NOT in IBusinessEntity
-    method public void AddWarning(pcMsg as character):
-        AddWarning(pcMsg,"").
-    end method. 
+    // sub classes can overide this for post processing after all data has been received - before being returned to the clcient
+    method protected void PostReceiveDataset(pGetRequest as Pmfo.Core.BusinessLogic.IGetDataRequest, phDataset as handle):
+    end method.
     
-    method protected void AddWarning(pcMsg as character, pcField as character):
-        if not valid-object(WarningMessages) then 
-            undo, throw new UnsupportedOperationError("AddWarning called outside request scope"). 
-        WarningMessages:Add(Resource, pcMsg, pcField).
-    end method. 
-   
-    method protected void ReceiveData(pParent as IBusinessEntity, pReceiveDataArgs as IReceiveDataEventArgs, phDataset as handle):
+    // sub classes can overide this if something must happen before the standard call to Receivebuffer or publish DataReceived
+    // known use cases - all are candidates for better ways to do this -  
+        // - PublicNameBe always loaddata 
+        // - BE that needs to fire DataReceived in children before parent -
+        //      this-object:OnDataReceived(pReceiveDataArgs, phDataset).
+        // - ClientBusinessEntity - has final ReceiveBuffer and Receivebuffer does not have args
+        //   - used for 2 (?) cases that needs to check the IReceiveDataEventArgs to set flag if refresh since it does not handle it
+       
+    method protected void BeforeReceiveData(pReceiveDataArgs as IReceiveDataEventArgs, phDataset  as handle):
+    end method.
+    
+    method protected final void ReceiveData(pParent as IBusinessEntity, pReceiveDataArgs as IReceiveDataEventArgs, phDataset as handle):
         define variable hBuffer as handle no-undo.
         define variable cTable  as character no-undo.
         define variable Htable  as handle no-undo.
+         
+        // allow override for BE with no data and buffer - for example PublicNameBe
+                           
+        BeforeReceiveData(pReceiveDataArgs,phDataset).
         
-        if not pReceiveDataArgs:Failed 
-        then
+        if not pReceiveDataArgs:Failed then
         do:
-            if valid-object(pParent) and SubscribeName > "" then
+            if valid-handle(phdataset) then
             do:
-                hBuffer = DatasetUtil:GetBufferByPathName(phDataset, SubscribeName).
-            end.
-            else
-                // the temp-table serialize-name may be an alias so use the table-handle to identify this from the resource
-                hBuffer = DatasetUtil:GetBufferBySerializeName(phDataset, Resource).
-             
+                if valid-object(pParent) and SubscribeName > "" then
+                    hBuffer = DatasetUtil:GetBufferByPathName(phDataset, SubscribeName).
+                else
+                    // the temp-table serialize-name may be an alias so use the table-handle to identify this from the resource
+                    hBuffer = DatasetUtil:GetBufferBySerializeName(phDataset, Resource).
+                
+            end.    
             if valid-handle(hBuffer) then
             do:
                 hTable = hBuffer:table-handle.
                 cTable = hTable:name.
-                
                 ReceiveBuffer(pParent,pReceiveDataArgs:Request:GetTableRequest(cTable),pReceiveDataArgs:Response:GetTableResponse(cTable), hBuffer).
             end.
         end.
-        
+         
         this-object:DataReceived:publish (this-object,pReceiveDataArgs, phDataset).
-       
+         
         if valid-object(pParent) then
         do:
             UnsubscribeDataReceived(pParent).
@@ -2676,122 +2771,38 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
     
     // override by application level subclass 
     method protected void BeforeUpdateBuffer( pUpdateRequest as IUpdateDataRequest, phBuffer as handle):
-    end method.
+        
+    end method. 
    
-    // call validateTable event hook (not really an event as we are not publishing ) 
+    // call validateTable event hook (not really an event as we are not publishing )
+     method public final void ValidateTable(pRequest as IUpdateDataEventArgs, phBuffer as handle).
+    //    ValidateDelegate:Validate( pRequest, phBuffer, false).   
+     end method.
+   
+    // will call validateTable or validateAction event hook (not really an event as we are not publishing )
     method protected final void ValidateBuffer(pRequest as IUpdateDataEventArgs, phBuffer as handle).
-        define variable hTable as handle no-undo.    
-        define variable cAction as character no-undo.
-        define variable lIsAction as logical no-undo.
-        define variable hLocalBuffer as handle no-undo.
-        hTable = phBuffer:table-handle.
-        lisAction = valid-object(pRequest:Request:CustomRequest) and type-of(pRequest:Request:CustomRequest,IAction).
-        
-        do on error undo, throw:
-             /** Call hook for static table   
-                 There is no way to define a super method for a static temp-table so we must use dynamic-invoke  
-              **/
-            if lisAction then
-                cAction = "ValidateAction".
-            else
-                cAction = "ValidateTable".
-             
-            dynamic-invoke (this-object,cAction,pRequest, table-handle hTable by-reference ).
-            
-            catch e1 as ValidationError:
-                // when ThrowBufferError is used in validationTable the buffer does not have a dataset.
-                // sso add the ewerror here
-                if phBuffer:error then 
-                    phBuffer:dataset:error = true.
-                else do:
-                    // the error may have been added to the buffer of the defined dataset 
-                    if Datasets[1]:error then 
-                        phBuffer:dataset:error = true.
-                      
-                end.        
-                undo, throw e1.        
-            end.    
-            catch e as Progress.Lang.Error :
-                // don't throw error if the method does not exist  
-                if e:GetMessageNum(1) <> 14457 then
-                    undo, throw e.     
-            end catch.
-        end.
-        if  ValidateRequiredFields // defaults to false as of current 
-        and lIsAction = false 
-        and phbuffer:error = false then 
-            ValidateMandatoryFields(pRequest,phbuffer).
-            
-    end method. 
-    
-    method protected final void ValidateMandatoryFields(pRequest as IUpdateDataEventArgs, phBuffer as handle).
-        define variable hQuery     as handle no-undo.
-        define variable hFld       as handle no-undo.
-        define variable hBeforeFld as handle no-undo.
-        define variable i          as integer no-undo.
-        define variable hBefore    as handle no-undo.
-        
-        hBefore = phbuffer:before-buffer.
-        create query hQuery.   
-        hQuery:add-buffer(phbuffer).
-        hQuery:query-prepare (subst("for each &1 where row-state(&1) = row-created or row-state(&1) = row-modified",phBuffer:name)).
-        hQuery:query-open ().
-        hQuery:get-first.
-        do while phBuffer:avail:
-            hBefore:find-by-rowid(phBuffer:before-rowid).
-            do i = 1 to phbuffer:num-fields:
-                hFld = phBuffer:buffer-field(i).
-                if phbuffer:row-state = row-modified then
-                    hBeforeFld =  hBefore:buffer-field(hFld:name).
-                if phbuffer:row-state = row-created
-                or hfld:buffer-value <> hBeforeFld:buffer-value then
-                do: 
-                    if ServerFields > "" and lookup(hfld:name,ServerFields) > 0 then
-                    do:
-                        if hFld:default-value = ? and hFld:buffer-value <> ? then
-                            BufferError(phBuffer,subst("&1 is not editable. It will be assigned a value on server.",GetLabel(hFLd)),hfld:name). 
-                    end.                 
-                    else if (hFld:default-value <> ? or lookup(hFld:name,RequiredFields) > 0) and hFld:buffer-value = ? then
-                    do:        
-                        if hFld:serialize-hidden = true then
-                        do:
-                            undo, throw new ApplicationError(subst("Entity Field &1 cannot be submitted with null. Please Contact IT.",hFld:name)).  
-                        end.
-                        else do:
-                            case hFld:data-type:
-                                when "character" or when "longchar" then
-                                    BufferError(phBuffer,subst("&1 is required, please enter a valid value",GetLabel(hFLd)),hfld:name).
-                                when "integer" or when "int64" then
-                                    BufferError(phBuffer,subst("&1 is required and cannot be empty, please enter a valid integer value",GetLabel(hFLd)),hfld:name).
-                                when "decimal" then
-                                    BufferError(phBuffer,subst("&1 is required and cannot be empty, please enter a valid number value",GetLabel(hFLd)),hfld:name).
-                                otherwise
-                                    BufferError(phBuffer,subst("&1 is required and cannot be empty, please enter a valid value",GetLabel(hFLd)),hfld:name).
-                               
-                            end.
-                        end.
-                    end.
-                end.
-                    
-            end.    
-            hQuery:get-next.
-        end.
-        finally:
-            if valid-object(hQuery) then
-                delete object hQuery.
-        end.    
-    end method. 
+        ValidateDelegate:ValidateBuffer(this-object, pRequest, phBuffer).
+    end method.
     
     method protected character GetLabel(pfld as handle):
-        if pFld:label <> pFld:name then 
-            return pFld:label.
-        else 
-            return StringUtil:CamelToWords(pFld:serialize-name).  
+        return BufferUtil:GetFieldLabel(pfld).
     end method.     
     
     // no default behavior - override by application level subclass  
     method protected void BeforeUpdateDataset( pUpdateRequest as IUpdateDataRequest, phDataset as handle):
     end method.
+    
+     // IFetchDelegator - NOT in IBusinessEntity
+    method public void AddWarning(pcMsg as character):
+        AddWarning(pcMsg,"").
+    end method. 
+    
+    method protected void AddWarning(pcMsg as character, pcField as character):
+        if not valid-object(WarningMessages) then 
+            WarningMessages = new WarningMessages().
+            // undo, throw new UnsupportedOperationError("AddWarning called outside request scope"). 
+        WarningMessages:Add(Resource, pcMsg, pcField).
+    end method. 
     
     method protected void BufferError(phBuffer as handle,pcMsg as character):
         // the ErrorStringUtil only works  with changed records that has error attributes
@@ -2908,7 +2919,6 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
     method protected IGetDataQuestion NewDataQuestion(pId as integer,phBuffer as handle, pcMessage as character):
         return new GetDataQuestion(subst("&1-&2",phBuffer:serialize-name,pid + ReservedConfirmationNumbers),pcMessage).
     end method.
-    
    
     // Ask Question using the predefined message
     method protected logical AskQuestion(pId as integer, phbuffer as handle, pUpdateRequest as IUpdateDataRequest):
@@ -3052,15 +3062,33 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
         AllDataIsFetched = false.   
     end. 
     
+    method protected void AddDeprecatedWarningAndLog(pcWarning as character, pcLogMessage as character):
+        if pcWarning > "" then
+        do:
+            if pcLogMessage > "" then
+                pcWarning = subst("&1 &2",pcWarning,"A note has been written to the log to inform IT about this.").
+            else 
+                pcLogMessage = pcWarning.           
+            
+            AddWarning(pcWarning).
+            if session:remote then 
+                message pcLogMessage.
+            else     
+                message pcLogMessage
+                        view-as alert-box warning title "Log Message - Will be written to log from Remote Session".           
+       end.    
+        
+    end.    
+      
     // overide to call any stuff needed by catalog that is lazy loaed (actions, functions)
     method public void PrepareCatalog().
     end method.
-	/*------------------------------------------------------------------------------
-	 Purpose:
-	 Notes:
-	------------------------------------------------------------------------------*/
-	destructor public BusinessEntity ( ):
+    /*------------------------------------------------------------------------------
+     Purpose:
+     Notes:
+    ------------------------------------------------------------------------------*/
+    destructor public BusinessEntity ( ):
         Destroy().
-	end destructor.
+    end destructor.
     
 end class.

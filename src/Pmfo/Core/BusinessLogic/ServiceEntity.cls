@@ -33,7 +33,7 @@ using Pmfo.Core.Common.WarningMessages from propath.
 
 class Pmfo.Core.BusinessLogic.ServiceEntity inherits DataService implements IServiceEntity abstract: 
     define public abstract property Resource as character no-undo  get.
-    
+    define public property IsDeprecated   as logical        no-undo get.  protected set. 
     define public property WarningMessages as IWarningMessages no-undo get. protected set.
     
     define public property ServerType as ServerTypeEnum no-undo 
@@ -66,6 +66,7 @@ class Pmfo.Core.BusinessLogic.ServiceEntity inherits DataService implements ISer
         protected set(plCanDelete as logical):
             AssertConstructorProperty().
             CanDelete = plCanDelete.
+           
         end.
          
     define public property CanCreate      as logical no-undo 
@@ -103,7 +104,8 @@ class Pmfo.Core.BusinessLogic.ServiceEntity inherits DataService implements ISer
         get():
             return CanCreate = false and CanUpdate = false and CanDelete = false.
         end.
-    
+            
+        
     // defaults to readonly,and thus default to false if any other Can* is true , 
     // to suppprt both GET and POST CanRead must be set to true   
     define public property CanRead      as logical init ? no-undo 
@@ -115,6 +117,7 @@ class Pmfo.Core.BusinessLogic.ServiceEntity inherits DataService implements ISer
                return CanRead.
         end.
         protected set(plCanRead as logical):
+            
             AssertConstructorProperty().
             CanRead = plCanRead.
         end.    
@@ -211,7 +214,7 @@ class Pmfo.Core.BusinessLogic.ServiceEntity inherits DataService implements ISer
         oProperties = this-object:GetClass():GetProperties(GetPropertyFlags()).
         do i = 1 to extent(oProperties):
             // skip objects
-            if oProperties[i]:DataTypeName = ? and  lookup(oProperties[i]:name,ExceptList) = 0 then
+            if oProperties[i]:DataTypeName = ? and lookup(oProperties[i]:name,ExceptList) = 0 then
                 oSet:Add(oProperties[i]). 
         end.
         return cast(oSet:ToArray(),Property).
@@ -222,7 +225,9 @@ class Pmfo.Core.BusinessLogic.ServiceEntity inherits DataService implements ISer
         define variable oPublicMethods as Method extent no-undo.
         define variable iPub as integer no-undo.      
         define variable iInternal as integer no-undo.  
+      
         oMethods = this-object:GetClass():GetMethods(GetMethodFlags()).
+        
         if ExceptMethodList > "" then 
         do:
             extent(oPublicMethods) = extent(oMethods) - num-entries(ExceptMethodList).
@@ -247,6 +252,23 @@ class Pmfo.Core.BusinessLogic.ServiceEntity inherits DataService implements ISer
          WarningMessages:Add(Resource, pcMsg).
     end method. 
     
+    method protected void AddDeprecatedWarningAndLog(pcWarning as character, pcLogMessage as character):
+        if pcWarning > "" then
+        do:
+            if pcLogMessage > "" then
+                pcWarning = subst("&1 &2",pcWarning,"A note has been written to the log to inform IT about this.").
+            else 
+                pcLogMessage = pcWarning.           
+            
+            AddWarning(pcWarning).
+            if session:remote then 
+                message pcLogMessage.
+            else     
+                message pcLogMessage
+                        view-as alert-box warning title "Log Message - Written to Log from Remote Session".           
+       end.    
+        
+    end.    
     
     method public override void Initialize():
         define variable i           as integer no-undo.
@@ -324,7 +346,8 @@ class Pmfo.Core.BusinessLogic.ServiceEntity inherits DataService implements ISer
         return oParameters. 
     end.     
     
-    method protected character GetPublicParameterName(pcName as character):
+    // public to allow use of reflection to resolve publci name from implementation
+    method public character GetPublicParameterName(pcName as character):
         define variable cChr as character no-undo.
         define variable i as integer no-undo.
         if pcName begins "p" then

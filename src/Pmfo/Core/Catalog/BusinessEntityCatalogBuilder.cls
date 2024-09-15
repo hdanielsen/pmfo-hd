@@ -47,7 +47,13 @@ class Pmfo.Core.Catalog.BusinessEntityCatalogBuilder inherits ResourceCatalogBui
     define protected property Actions           as IMap          no-undo get. set. 
     define protected property Resource          as character     no-undo get. set.
     define protected property InheritsResource  as character     no-undo get. set.
-    define protected property PrimitiveFunctionMap as IStringStringMap no-undo get. set.
+    define protected property PrimitiveFunctionMap as IStringStringMap no-undo 
+        get():
+            if not valid-object(PrimitiveFunctionMap) then 
+                PrimitiveFunctionMap = new StringStringMap().
+            return PrimitiveFunctionMap.        
+        end. 
+        set.
     define protected variable ResourceTextField as character no-undo.
      
     define public property ServiceManager as IServiceManager no-undo
@@ -96,8 +102,6 @@ class Pmfo.Core.Catalog.BusinessEntityCatalogBuilder inherits ResourceCatalogBui
         do i = 1 to extent(oMethods):
             if oMethods[i]:ReturnTypeName = ? and Progress.Reflect.DataType:Void <> oMethods[i]:ReturnType and Progress.Reflect.DataType:Handle <> oMethods[i]:ReturnType then
             do: 
-                if not valid-object(PrimitiveFunctionMap) then 
-                    PrimitiveFunctionMap = new StringStringMap().
                 PrimitiveFunctionMap:put(oMethods[i]:name,oMethods[i]:ReturnType:ToString() + if oMethods[i]:ReturnExtent > 0 then " extent" else "").    
             end.  
         end.  

@@ -25,6 +25,7 @@ using Pmfo.Util.Array from propath.
 using Pmfo.Util.PrimitiveHolderUtil from propath.
 using Pmfo.Util.StringUtil from propath.
 using Progress.Json.ObjectModel.JsonObject from propath.
+using Progress.Lang.Object from propath.
 
 class Pmfo.Core.Common.Key implements IKey: 
 
@@ -64,6 +65,20 @@ class Pmfo.Core.Common.Key implements IKey:
             PrimitiveHolderUtil:AddToJson(FieldValues[i]:Name,FieldValues[i]:Value, oJson).  
         end.    
         return oJson.
+    end method.
+    
+    method public JsonObject NameAndValueToJson():
+        define variable oJson as JsonObject no-undo.
+        define variable i  as integer no-undo.
+         
+        oJson = new JsonObject().
+        do i = 1 to extent(FieldValues) on error undo, throw:
+            PrimitiveHolderUtil:AddNameAndValueToJson(FieldValues[i]:Name,FieldValues[i]:Value, oJson).
+             
+        end.    
+         
+        return oJson.
+        
     end method.
         
     method public override character ToString():
@@ -157,4 +172,34 @@ class Pmfo.Core.Common.Key implements IKey:
        end.                              
        return cRowKey. 
     end method.
+    
+    method public override logical Equals(pObject as Object):
+        define variable i as integer no-undo.
+        define variable J as integer no-undo.
+        define variable oOtherFieldValues as IFieldValue extent no-undo.
+        define variable lOk as logical no-undo.
+        
+        if super:Equals(pObject) then
+            return true.
+        if type-of(pObject,IKey) = false then
+            return false.
+        
+        oOtherFieldValues = cast(pObject,IKey):FieldValues.
+        // this is not as expensive as it looks the number of fields in a key is low and in most cases 1.       
+        outerloop:
+        do i = 1 to extent(FieldValues):
+            do j = 1 to extent(oOtherFieldValues):
+                // if match was found check this objec's next fieldvalue  
+                if FieldValues[i]:Equals(oOtherFieldValues[j]) then 
+                   next outerloop.        
+            end.
+            // if none of the oOtherFieldValues is a match then this is not equals  
+            return false.
+        end.
+        // if we get here all fields are equals (also if both are empty)
+        return true.
+        
+    end method.    
+    
+    
 end class.

@@ -111,7 +111,7 @@ class Pmfo.Core.BusinessLogic.Parser.MethodParser:
         
         if oParameterList:NumParameters > 0 then
         
-            PrepareInputParameters(oMethod,oParameterList, oParameters).
+            PrepareInputParameters(pEntity,oMethod,oParameterList, oParameters).
         
         if Progress.Reflect.DataType:Void:Equals(oMethod:ReturnType) then 
         do:
@@ -124,7 +124,7 @@ class Pmfo.Core.BusinessLogic.Parser.MethodParser:
            do: 
                oJsonResponse = new JsonObject().
                oJsonDetails = new JsonObject().
-               AddOutputValuesToJson(oMethod,oJsonDetails).
+               AddOutputValuesToJson(pEntity,oMethod,oJsonDetails).
                oJsonResponse:Add(pResponNodeName,oJsonDetails).
            end.   
         end.
@@ -191,7 +191,7 @@ class Pmfo.Core.BusinessLogic.Parser.MethodParser:
                 
                 do iParameter = 1 to extent(oParameters).  
                    if oParameters[iParameter]:Mode = Progress.Reflect.ParameterMode:Input 
-                   and lookup(GetPublicParameterName(oParameters[iParameter]:name),pcParameterNames) > 0 then
+                   and lookup(pEntity:GetPublicParameterName(oParameters[iParameter]:name),pcParameterNames) > 0 then
                        iMatches = iMatches + 1.
                    
                    else do:
@@ -238,7 +238,7 @@ class Pmfo.Core.BusinessLogic.Parser.MethodParser:
                 
         do iParameter = 1 to extent(oParameters).
             if oParameters[iParameter]:Mode = Progress.Reflect.ParameterMode:Input 
-            and lookup(GetPublicParameterName(oParameters[iParameter]:name),pcParameterNames) > 0 then
+            and lookup(pEntity:GetPublicParameterName(oParameters[iParameter]:name),pcParameterNames) > 0 then
                 iMatches = iMatches + 1.
             else 
                 leave. 
@@ -258,24 +258,7 @@ class Pmfo.Core.BusinessLogic.Parser.MethodParser:
                                                   
     end method.
      
-    method protected character GetPublicParameterName(pcName as character):
-        define variable cChr as character no-undo.
-        define variable i as integer no-undo.
-        if pcName begins "p" then
-        do:
-            do i = 1 to 3:
-                cChr = substr(pcName,i,1).
-                if i > 1 and  not compare(cChr,"eq",lc(cChr),"case-sensitive") then
-                do:
-                    pcName = lc(substr(pcName,i,1)) + substr(pcName,i + 1).
-                    leave.
-                end.    
-            end.
-        end.    
-        return pcName.
-    end method.
-    
-    method protected void PrepareInputParameters(pMethod as Method,pParameterList as ParameterList,pParameters as IStringStringMap):
+    method protected void PrepareInputParameters(pEntity as IServiceEntity,pMethod as Method,pParameterList as ParameterList,pParameters as IStringStringMap):
         define variable iPosition           as integer   no-undo.
         
         define variable cInternalInputNames as character no-undo.
@@ -290,7 +273,7 @@ class Pmfo.Core.BusinessLogic.Parser.MethodParser:
         do iPosition = 1 to extent(oMethodParameters):
             cInternalInputNames = cInternalInputNames 
                                 + (if iPosition = 1 then "" else ",") 
-                                + if oMethodParameters[iPosition]:Mode = Progress.Reflect.ParameterMode:Input then GetPublicParameterName(oMethodParameters[iPosition]:name) else ""
+                                + if oMethodParameters[iPosition]:Mode = Progress.Reflect.ParameterMode:Input then pEntity:GetPublicParameterName(oMethodParameters[iPosition]:name) else ""
                                 .
                                 
         end.     
@@ -551,7 +534,7 @@ class Pmfo.Core.BusinessLogic.Parser.MethodParser:
         end.        
     end method.   
     
-    method public void AddOutputValuesToJson(pMethod as Method,pJson as JsonObject).
+    method protected void AddOutputValuesToJson(pServiceEntity as IServiceEntity,pMethod as Method,pJson as JsonObject).
         define variable oParams   as Parameter extent no-undo.
         define variable iPosition as integer no-undo.
         define variable cLongValue as longchar no-undo.
@@ -565,33 +548,33 @@ class Pmfo.Core.BusinessLogic.Parser.MethodParser:
                      
                 case oParams[iPosition]:DataType:
                     when Progress.Reflect.DataType:Character then
-                        pJson:Add(GetPublicParameterName(oParams[iPosition]:name),ttOutput.characterValue).
+                        pJson:Add(pServiceEntity:GetPublicParameterName(oParams[iPosition]:name),ttOutput.characterValue).
                     when Progress.Reflect.DataType:Longchar then 
                     do:
                         copy-lob ttOutput.clobValue to cLongValue.
                        // does this work?? 
-                        pJson:Add(GetPublicParameterName(oParams[iPosition]:name),cLongValue).
+                        pJson:Add(pServiceEntity:GetPublicParameterName(oParams[iPosition]:name),cLongValue).
                     end.
                     when Progress.Reflect.DataType:Integer then
-                        pJson:Add(GetPublicParameterName(oParams[iPosition]:name),ttOutput.integerValue).
+                        pJson:Add(pServiceEntity:GetPublicParameterName(oParams[iPosition]:name),ttOutput.integerValue).
                     
                     when Progress.Reflect.DataType:Int64 then
-                        pJson:Add(GetPublicParameterName(oParams[iPosition]:name),ttOutput.int64Value).
+                        pJson:Add(pServiceEntity:GetPublicParameterName(oParams[iPosition]:name),ttOutput.int64Value).
                     
                     when Progress.Reflect.DataType:Decimal then
-                        pJson:Add(GetPublicParameterName(oParams[iPosition]:name),ttOutput.decimalValue).
+                        pJson:Add(pServiceEntity:GetPublicParameterName(oParams[iPosition]:name),ttOutput.decimalValue).
                          
                     when Progress.Reflect.DataType:Logical then
-                        pJson:Add(GetPublicParameterName(oParams[iPosition]:name),ttOutput.logicalValue).
+                        pJson:Add(pServiceEntity:GetPublicParameterName(oParams[iPosition]:name),ttOutput.logicalValue).
                     
                     when Progress.Reflect.DataType:Date then
-                        pJson:Add(GetPublicParameterName(oParams[iPosition]:name),ttOutput.dateValue).
+                        pJson:Add(pServiceEntity:GetPublicParameterName(oParams[iPosition]:name),ttOutput.dateValue).
                     
                     when Progress.Reflect.DataType:Datetime then
-                        pJson:Add(GetPublicParameterName(oParams[iPosition]:name),ttOutput.datetimeValue).
+                        pJson:Add(pServiceEntity:GetPublicParameterName(oParams[iPosition]:name),ttOutput.datetimeValue).
                         
                     when Progress.Reflect.DataType:Datetimetz then
-                        pJson:Add(GetPublicParameterName(oParams[iPosition]:name),ttOutput.datetimetzValue).
+                        pJson:Add(pServiceEntity:GetPublicParameterName(oParams[iPosition]:name),ttOutput.datetimetzValue).
                     
                 end case.
             end.    

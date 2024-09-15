@@ -6,7 +6,7 @@
     Description : 
     Author(s)   : hdaniels
     Created     : Tue Apr 02 15:51:12 EDT 2019
-    Notes       : note
+    Notes       : 
   ----------------------------------------------------------------------*/
 
 
@@ -37,6 +37,14 @@ class Pmfo.Core.BusinessLogic.AbstractQueryPredicate abstract inherits QueryEntr
         Assert:NotNull(pOperator, 'Operator').
         assign FieldName   = pFieldName
                Operator    = pOperator
+               .
+          
+    end constructor.
+    
+    constructor protected AbstractQueryPredicate (input pFieldName as character):
+        
+        Assert:NotNullOrEmpty(pFieldName, 'Field name').
+        assign FieldName   = pFieldName
                .
           
     end constructor.

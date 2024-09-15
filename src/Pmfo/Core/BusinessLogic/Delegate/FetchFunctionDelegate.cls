@@ -191,7 +191,6 @@ class Pmfo.Core.BusinessLogic.Delegate.FetchFunctionDelegate implements IFetchFu
         return BufferUtil:GetRowName(hBuffer, true). 
     end method.    
    
-    
     method protected void AssertKey(phbuffer as handle, pcKey as character):
         if num-entries(pcKey) > 1 then 
             undo, throw new UnsupportedOperationError(subst("Fetch for &1 key with multiple fields - &2",BufferUtil:GetRowName(phBuffer, true),StringUtil:GetMessageFromEntries(pcKey," and ", true))).

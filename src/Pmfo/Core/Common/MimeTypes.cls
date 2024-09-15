@@ -112,6 +112,7 @@ class Pmfo.Core.Common.MimeTypes implements IMimeTypes:
         ImageMap:put("application/vnd.openxmlformats-officedocument.presentationml.presentation","pptx").
         ImageMap:put("application/vnd.openxmlformats-officedocument.presentationml.template","potx").
         ImageMap:put("application/vnd.openxmlformats-officedocument.presentationml.slideshow","ppsx").
+        ImageMap:put("application/vnd.ms-excel","xls").
         ImageMap:put("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","xlsx").
         ImageMap:put("application/vnd.openxmlformats-officedocument.spreadsheetml.template","xltx").
         ImageMap:put("audio/mpeg","mp3").

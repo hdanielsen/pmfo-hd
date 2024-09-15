@@ -42,7 +42,7 @@ class Pmfo.Core.Collections.{&classname} implements {&interface}:
            over the contents of the Map) and is expected to be scoped to a small block
            like a single method. */
            &if "{&keytype}" = "integer" &then  
-         return new Pmfo.Core.Collections.IntegerKeySet(this-object, temp-table PrimitiveMap:handle, substitute('ParentMap eq &1':u, int64(this-object)), "Key").
+        return new Pmfo.Core.Collections.IntegerKeySet(this-object, temp-table PrimitiveMap:handle, substitute('ParentMap eq &1':u, int64(this-object)), "Key").
            &else
         return new Pmfo.Core.Collections.KeySet(this-object, temp-table PrimitiveMap:handle, substitute('ParentMap eq &1':u, int64(this-object)), "Key").
            &endif     

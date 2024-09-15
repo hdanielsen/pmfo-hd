@@ -104,6 +104,10 @@ using Progress.Lang.FlagsEnum from propath.
 using Progress.Lang.ParameterList from propath.
 using Pmfo.Util.QueryUtil from propath.
 using Pmfo.Core.BusinessLogic.IQueryEntry from propath.
+using Pmfo.Core.BusinessLogic.JsonManyToManyWriter from propath.
+using Pmfo.Core.BusinessLogic.IUpdateDataResponse from propath.
+using Pmfo.Core.BusinessLogic.Action from propath.
+using Pmfo.Core.Error.NotImplementedError from propath.
  
  
 class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler implements IOperationHandler,ISupportLogging: 
@@ -202,7 +206,6 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
     // subclass hook 
     method protected void AddBusinessEntityProperties(pJson as JsonObject, pBusinessEntity as IBusinessEntity, pClientRequest  as ICLientRequest ):
     end.   
-    
      
     method protected RowStateEnum GetMethodRowStateEnum (pcMethod as char, plAction as logical):
         if plAction then
@@ -276,7 +279,7 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
         define variable lReturnDataAfterDelete as logical no-undo.
         define variable lRecursive             as logical no-undo.
         define variable oJsonWriter            as IJsonWriter           no-undo.
-         
+      
         if type-of(pEntity,IBusinessEntity) then 
              oBusinessEntity = cast(pEntity,IBusinessEntity).
         else     
@@ -372,6 +375,13 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
                 //  - or prepare a request and set lUniqueAction true to avoid   
                 if oClientUpdateRequest:Keywheres[extent(oClientUpdateRequest:Keywheres) - 1] > "" then
                 do:
+                    //if oAction:IsEmpty then 
+                      //   undo, throw new IllegalOperationError(subst("Request for &1(&2). The Action does not support key(s) in the URL",
+                        //                                                    oClientUpdateRequest:Collections[extent(oClientUpdateRequest:Collections) - 1],
+                          //                                                  oClientUpdateRequest:KeyWheres[extent(oClientUpdateRequest:Keywheres) - 1]
+                            //                                                )). 
+                             
+                    
                     if pcMethod = "POST" 
                     // we're not able to handle empty json for action that is child  - 
                     // would likely need to invoke the FindParentsRequestBuilder - see below before we find the child
@@ -385,8 +395,13 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
                                 undo, throw new IllegalOperationError(subst("Request for &1(&2) with no requested buffer",
                                                                             oClientUpdateRequest:Collections[extent(oClientUpdateRequest:Collections) - 1],
                                                                             oClientUpdateRequest:KeyWheres[extent(oClientUpdateRequest:Keywheres) - 1]
-                                                                            
                                                                             )). 
+                            
+                            if MethodBindingEnum:Entity:Equals(oAction:Binding) then 
+                                undo, throw new IllegalStateError(subst("Action &1 has Binding to a single Entity and is marked as IsCreate",
+                                                                            oAction:name
+                                                                            )). 
+                            
                              // return true if created  (no messagebody) 
                             lRowCreatedFromURL = AssignKeysFromUrl(pcMethod, oClientUpdateRequest, pMessageBody, hRequestedBuffer, true). // true = action
                         end.
@@ -395,9 +410,10 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
                             // return false if the fetch cannot be resolved and valid-object(pMessageBody) - allowing the json body to 
                             // be processed below 
                             // True means the top buffer is empty - there may be child data 
+                           
                             lActionWithoutBody = GetRowForUniqueAction(oUpdateBe, oAction, oClientUpdateRequest, hDataset, hRequestedBuffer, pMessageBody).
-                                
-                        end.        
+                           
+                        end.
                     end.
                     else do:
                         // define request and set flag to validate the uniqueness after json has been processed 
@@ -405,24 +421,51 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
                         lUniqueAction = true.  
                     end.    
                 end.
-                else if type-of(oUpdateBE,IDynamicChild) and oUpdateBe <> oBusinessentity then 
+                else if MethodBindingEnum:Entity:Equals(oAction:Binding) then
                 do:
-                    GetParentRowsForDynamicChild(oBusinessEntity, oClientUpdateRequest, hDataset).
-                    lActionHasParent = true. 
+                   // if valid-object(pMessageBody) = false then 
+                    undo, throw new IllegalOperationError(subst("Request for Action &1 with Binding to Entity without key in URL",
+                                                                 oAction:name 
+                                                               )
+                                                          ).
+                   
                 end.
-                /** tested for cases where parent(s) has key and child does not not  need logic to manage empty or not
-                else do:
-                    oGetActionDataRequest = CreateRequestForUniqueAction(oClientUpdateRequest, hDataset,extent(oClientUpdateRequest:Collections) - 1).
-                    oBusinessEntity:GetData(oGetActionDataRequest, output dataset-handle hDataset by-reference).
-                    
-                     
+                else if oAction:IsEmpty then 
+                do:
+                    if valid-object(pMessageBody) then 
+                        undo, throw new IllegalOperationError(subst("Request for Action &1 does not support JSON body",
+                                                                     oAction:name 
+                                                                    )
+                                                               ).
+                   
+                    lActionWithoutBody = true.                                               
                 end.
-                **/
-                
+                else  
+                do:
+                    if type-of(oUpdateBE,IDynamicChild) and oUpdateBe <> oBusinessentity then 
+                    do:
+                        GetParentRowsForAction(oBusinessEntity, oClientUpdateRequest, hDataset).
+                        lActionHasParent = true. 
+                    end.
+                    else if oUpdateBe <> oBusinessentity 
+                    and valid-object (pMessageBody) = false  
+                    and oAction:IsCreate then
+                    do:
+                        //  for now only manage one parent up 
+                        // this will load the parent and call the action in the child with no child record 
+                        
+                        if oClientUpdateRequest:Collections[extent(oClientUpdateRequest:Collections) - 2] = oBusinessentity:resource then
+                        do: 
+                            GetParentRowsForAction(oBusinessEntity, oClientUpdateRequest, hDataset).
+                            
+                            lActionWithoutBody = true.
+                            lActionHasParent = true. 
+                        end. 
+                    end.
+                end. //  isempty false
             end. 
             else 
                 undo, throw new UnsupportedOperationError(subst("Custom Request of Type &1",oUpdateDataRequest:CustomRequest:GetClass():TypeName)).
-                
         end.   
         else  
         do: 
@@ -483,7 +526,7 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
                 end.
                 
                 oJsonReader = GetJsonReader(oUpdateBe,pcMethod,oAction).
-            
+             
                 ojsonReader:ImportJson(hRequestedBuffer, 
                                        false,
                                        jsonRequest,
@@ -492,7 +535,8 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
                                        if lBeforeImage 
                                        then BeforeImageReadEnum:AssignAfterFromBeforeImage
                                        else BeforeImageReadEnum:None).
-                                       
+                
+                                 
                 catch eval as ValidationError :
                      oUpdateBe:ThrowDatasetError(hDataset).    
                 end catch.  
@@ -501,7 +545,7 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
                 end catch.
             end.
             else do:
-                         
+               
                 // TODO - all these rules should be moved to UpdateDataRequest
                 // TODO -  BeforeImageReadEnum:AssignAfterFromBeforeImage should be used always if there is before iamge data 
                 //         This is assuimed to now - it is a safe option that only kicks in if fields are missing from the after image and exists in the before image
@@ -542,21 +586,19 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
                 else 
                     oBeforeImageReadOption = oBusinessentity:BeforeImageReadOption.
                 
-               
-                
                 // check conditions and flags that tells that we cannot use read-json and load using jsonreader  
                 // MOTE: This should be able to handle every case but we currently check the conditionsa tthat requires this and
                 // have an else below since read-json is faster 
                 if (pcMethod = "PUT" and (lBeforeImageRequired = false or oBusinessEntity:UseJsonReaderOnPut )) 
                 or (pcMethod = "DELETE" and not lBeforeImageRequired) 
-                // UseJsonLoadedOnPost defaults to returns true if NextIdent or the BE implements JsonLoadHandler  
+                // UseJsonReaderOnPost defaults to returns true if NextIdent or the BE implements IJsonReadHandler or IJsonReadHandlerProvider  
                 // can also be set to true for other reasone       
                 // if actionwithoiutbody is true and we  get here we have child json and need to use the logic hjere
                 // to avoid creating another record (which would happen using dataset:read-json below) 
-                or (pcMethod = "POST" and (lUseJsonReaderOnPost or lActionWithoutBody or oUpdateDataRequest:RequestType = RequestTypeEnum:MultiTable)) 
+                
+                or (pcMethod = "POST" and (lUseJsonReaderOnPost or lActionWithoutBody or oUpdateDataRequest:RequestType = RequestTypeEnum:MultiTable))
                 then
                 do on error undo, throw:
-                    
                     if lBeforeImage then 
                     do:
                         if oUpdateDataRequest:RequestType = RequestTypeEnum:MultiTable then 
@@ -595,7 +637,8 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
                         // REGRET (for PMFO future): should not have allowed this  
                         oJsonBeforeImageValidator = new JsonBeforeImageValidator(pcMethod).
                         oJsonBeforeImageValidator:Parse(jsonDatasetRequest).
-                    end.    
+                    end.   
+                   
                     hDataset:read-json ("JsonObject",jsonDatasetRequest,"append"). // empty, but if there is data replace is correct
                     
                     if lBeforeImage = false then 
@@ -625,9 +668,11 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
             
         end.
         // Throw error if none of the preconditions to update without body is true 
-        else if lRowCreatedFromURL = false and lActionWithoutBody = false then 
+        else 
+        if (lRowCreatedFromURL = false and lActionWithoutBody = false) then
+        do: 
             undo, throw new UnprocessableEntityError(subst("'&1' request must have a valid json object body (or a key in the URL if supported)",pcMethod)).
-        
+        end.
          // NOT an action with no body 
        // else @TODO need error handling or management of metric support for actions woth no body 
         // if we have a BE for the requested table different than the requested resource use that from now on 
@@ -660,9 +705,19 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
         do:
             // support repsone with refreshed data after delete - added for recursive cases where 
             // the delete may be posted for a record further down the tree and parents may be updated an not deleted 
+             
             if hDataset:get-buffer-handle(1):table-handle:has-records then
             do: 
-                lReturnDataAfterDelete = true.
+                // TODO - clean up
+                // The else stuff below is aquick fix to keep behavior for recursive 
+                // but avoid for delete of requested child where the parent is not returned in the json 
+                if valid-handle(hRequestedbuffer) = false then 
+                    lReturnDataAfterDelete = true.
+                else if hDataset:get-buffer-handle(1) = hRequestedbuffer then  
+                    lReturnDataAfterDelete = true.
+                else if valid-handle(DatasetUtil:GetRecursiveRelation(hRequestedBuffer)) then
+                    lReturnDataAfterDelete = true.
+                    
             end.   
         end.
         
@@ -721,9 +776,7 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
                     if lRecursive then 
                         oJsonWriter = new JsonRecursiveWriter().  
                 end.      
- 
-              
-                 
+                
                // TODO - clean up  - GetEntityResponse dedicated for update 
                 jsonResponse = GetEntityResponse(pcBaseAppTransportServiceURI,
                                                 hDataset, 
@@ -732,11 +785,15 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
                                                 if valid-object(oGetDataRequest) then oGetDataRequest:TableRequests else oEmptyTableRequests, 
                                                 hRequestedBuffer, 
                                                 "", // not pn use - option to slect some fields -   cActionFields,
-                                                oClientUpdateRequest:Relations,
+                                                MergeLinks(oBusinessEntity, oClientUpdateRequest:Relations),
                                                 oUpdateDataRequest:RequestType,
-                                                true, // no error - don't throw 404 for missing requestebuffer after an update    
-                                                if Pmfo.Core.Common.ServerTypeEnum:TextPlain:Equals(this-object:ServiceManager:ServerType) then ResponseMetaDataEnum:None
-                                                else ResponseMetaDataEnum:NavigationLinks,
+                                                true, // no error - don't throw 404 for missing requestebuffer after an update
+                                                // probably no need for links, but this was added after used MergeLinks for paramter 8
+                                                // so as not to break behavior if it ever worked for this 
+                                                // since BE links never have been passed before we added the merge using None when there is no Relations
+                                                // s consistetn with prev behavio r     
+                                                if valid-object(oClientUpdateRequest:Relations) then  ResponseMetaDataEnum:NavigationLinks
+                                                else ResponseMetaDataEnum:None,
                                                 "",  // select property name not applicable for update (used for error)
                                                 true, // this is an update response
                                                 false
@@ -750,17 +807,25 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
             lDeleteAndNoContent = true.
            
         /***
-           WarningMessages and successMessages have some differences that currently requires different approaches
-           TODO - unify and abstract this and also add info messages
+           UpdateDataResponse:Messages, WarningMessages and successMessages have some differences that currently requires different approaches
+           TODO - UpdateDataResponse:Messages is intended to unify and abstract this togeterh
+           //  and also add info messages
         ***/   
-        /*
+        
+        // messages that requires more than just yes no 
+        if valid-object(oResponse) and type-of(oResponse,IUpdateDataResponse) and cast(oResponse,IUpdateDataResponse):Messages:Size > 0 then 
+        do:
+            jsonResponse:Add(MessageEntityName,cast(oResponse,IUpdateDataResponse):Messages:ToJsonArray()).
+            lDeleteAndNoContent = false.
+        end.
+         /*
            Warningmessages Can be also be added on server and is currently returned from DA in a temp-table
                            It is also used both on GET and here    
                            The WarningMessages is thus a temp-table wrapper created at the start of a request
                            that knows the dataset of the request
                            The dataset is used to convert internal field names to serfializenames gfetting 
                            the dataset buffer form serializ-name
-        */ 
+        */
         if valid-object(oBusinessEntity:WarningMessages) and oBusinessEntity:WarningMessages:HasData then
         do:
             jsonResponse:Add(WarningEntityName,oBusinessEntity:WarningMessages:ToJsonArray()).
@@ -861,58 +926,43 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
         end.    
     end.
     
-    method private void FlattenXRefLinks(pJson as JsonObject, pParent as character, pLinks as ICollection):
-        define variable cNames as character extent no-undo.
-        define variable i as integer no-undo.
-        define variable j as integer no-undo.
+    method private void FlattenXRefLinks(pJson as JsonObject, pRequestedBuffer as handle, pLinks as ICollection):
         define variable oIterator as IIterator no-undo.
         define variable oRelDef   as IRelationDefinition no-undo.
-        define variable cFlattenList as character no-undo.
+        define variable lHasXref as logical no-undo.
+        define variable oJsonManyToManyWriter as JsonManyToManyWriter no-undo. 
+        define variable cParent as character no-undo.
         
-        if valid-object(pLinks) and pLinks:size > 0 then
+        if valid-object(pLinks) then 
         do:
             oIterator = pLinks:Iterator().
            
-            if pParent > "" then
-            do while oIterator:HasNext().
-                oRelDef = cast(oIterator:Next(),IRelationDefinition).
-               
-                if oReldef:ParentName = pParent 
-                and type-of(oRelDef,IRelation) 
-                and cast(oReldef,IRelation):Xref then
-                do: 
-                    cFlattenList = cFlattenList 
-                                 + (if cFlattenList = "" then "" else ",")
-                                 + oReldef:PublicName.   
-                end. 
-            end. 
-           
-            if cFlattenList > "" then
-            do:
-                cNames = pjson:GetNames().
-                do i = 1 to extent(cNames):
-                     if pjson:GetType(cNames[i]) = JsonDataType:Array 
-                     or pjson:GetType(cNames[i]) = JsonDataType:Object then
-                     do:
-                         if cFlattenList > "" and lookup(cNames[i],cFlattenList) > 0 then
-                         do:
-                             ReplaceXrefWithEntity(pjson, cNames[i]).
-                         end.
-                         else if pjson:GetType(cNames[i]) = JsonDataType:Array then
-                         do:
-                             do j = 1 to pjson:GetJsonArray(cNames[i]):Length:
-                                 
-                                 if pjson:GetJsonArray(cNames[i]):GetType(j) = JsonDataType:OBJECT then 
-                                     FlattenXRefLinks(pjson:GetJsonArray(cNames[i]):GetJsonObject(j),cNames[i],pLinks).
-                             end.                        
-                         end.
-                         else  
-                         do:
-                             FlattenXRefLinks(pJson:GetJsonObject(cNames[i]),cNames[i],pLinks).   
-                         end.
-                     end. 
-                end.
+            if valid-handle(pRequestedBuffer) then 
+            do: 
+                if valid-handle(pRequestedBuffer:parent-relation) then 
+                    cParent = pRequestedBuffer:parent-relation:parent-buffer:serialize-name.
+                else     
+                    cParent = pRequestedBuffer:serialize-name.
             end.
+            if cParent > "" then 
+            do:
+                do while oIterator:HasNext().
+                    oRelDef = cast(oIterator:Next(),IRelationDefinition).
+                    if oReldef:Xref 
+                    // TODO: no need to check for this since it is inherited, will remove when tested 
+                    or (type-of(oRelDef,IRelation) and cast(oReldef,IRelation):Xref) then
+                    do:
+                        lHasXref = true.
+                        leave.
+                    end.      
+                end. 
+               
+                if lHasXref then 
+                do:
+                    oJsonManyToManyWriter = new JsonManyToManyWriter().
+                    oJsonManyToManyWriter:FlattenXRefLinks(pJson, cParent, pLinks).
+                end.
+            end.    
         end.
     end method.     
     
@@ -924,7 +974,7 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
         define variable cParentName as character no-undo.
         define variable oRelation   as IRelation no-undo.
         define variable oRelDef     as IRelationDefinition no-undo.
-        
+         
         oLinks = new Collection(). 
         // if expandedlinks we need to keep track of the belinks that we add
         if valid-object(pExpandedLinks) and pExpandedLinks:size > 0 then
@@ -941,17 +991,21 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
         end.
         else 
            oLinks:addAll(pBe:Links).
-        if oLinks:size > 0 then
+        
+        if Valid-object(pExpandedLinks) then
         do:
-            oIterator = pExpandedLinks:Iterator().
-            do while oIterator:HasNext():
-                oRelDef = cast(oIterator:Next(),IRelationDefinition).
-                if lookup(subst("&1-&2",oRelDef:ParentName,oRelDef:PublicName),cLinkNames) = 0 then
-                   oLinks:Add(oRelDef).
-            end.    
+            if oLinks:size > 0 then
+            do:
+                oIterator = pExpandedLinks:Iterator().
+                do while oIterator:HasNext():
+                    oRelDef = cast(oIterator:Next(),IRelationDefinition).
+                    if lookup(subst("&1-&2",oRelDef:ParentName,oRelDef:PublicName),cLinkNames) = 0 then
+                       oLinks:Add(oRelDef).
+                end.    
+            end.
+            else 
+                oLinks:addAll(pExpandedLinks).
         end.
-        else 
-            oLinks:addAll(pExpandedLinks).
         return oLinks.  
     end method.     
     
@@ -1028,8 +1082,6 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
         return oUseBe.
     end method.  
     
-    
-    
     /* public for unit test - not in interface
         handle  GET or HEAD request 
        The head request returns after url and query has been processed and validated                               
@@ -1068,7 +1120,7 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
         define variable iCollectionWhere               as integer                   no-undo.
         define variable oFunction                      as character                 no-undo. 
         define variable lNoContentResponse             as logical                   no-undo.
-        define variable oApplyPtocessor            as ApplyRequestProcessor no-undo.
+        define variable oApplyRequestProcessor         as ApplyRequestProcessor no-undo.
         
         if type-of(pEntity,IBusinessEntity) then 
              oBusinessEntity = cast(pEntity,IBusinessEntity).
@@ -1127,7 +1179,7 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
                 if oClientGetRequest:KeyWheres[extent(oClientGetRequest:Collections) - iCollectionWhere] = "" then
                     undo, throw new UnsupportedOperationError(subst("GET '&1' '&2' primitive bound function without key in the URL",hRequestedBuffer:serialize-name,oClientGetRequest:Collections[extent(oClientGetRequest:Collections)])).
             end.
-          
+           
             oPrimitiveResponse = oBusinessEntity:GetData(oGetDataRequest,input dataset-handle hDataset by-reference).
             //bug workaroudn for onetone child -  if this is not done the findunique fails
             // there are likely better workarounds
@@ -1208,8 +1260,8 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
                         // temprasry limitation - see comments in method 
                         AssertApplyAndFilter(oGetDataRequest,  hRequestedBuffer, oClientGetRequest:GroupBy).
                     end.                    
-                    oApplyPtocessor = new ApplyRequestProcessor().
-                    jsonResponse = oApplyPtocessor:ProcessApply(oClientGetRequest,hDataset,hRequestedBuffer).
+                    oApplyRequestProcessor = new ApplyRequestProcessor().
+                    jsonResponse = oApplyRequestProcessor:ProcessApply(oClientGetRequest,hDataset,hRequestedBuffer).
                 end.              
                 else do:
                     oJsonWriter = oBusinessEntity:GetJsonWriter(GetMethodRowStateEnum(pcMethod,false),
@@ -1423,68 +1475,6 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
         pClientRequest:Redirect(pcRedirect). 
         return oBe.
     end method.        
-            
-    method protected void ReplaceXrefWithEntity(pParentJson as JsonObject, pcSerializename as character):
-        define variable oEntityJson    as JsonObject no-undo. 
-        define variable cNames         as character  extent no-undo.
-        define variable oNewJson       as JsonObject no-undo.
-        define variable oNewJsonArray  as JsonArray  no-undo.
-        define variable oOldJson       as JsonObject no-undo.
-        define variable oOldJsonArray  as JsonArray  no-undo.
-        define variable iExtent        as integer no-undo.
-        define variable iName          as integer no-undo.
-        
-        if pParentJson:GetType(pcSerializename) = JsonDataType:ARRAY then
-        do:
-            oNewJsonArray = new JsonArray().
-            oOldJsonArray = pParentJson:GetJsonArray(pcSerializename).
-            do iExtent = 1 to oOldJsonArray:Length:     
-                oOldJson = oOldJsonArray:GetJsonObject(iExtent).
-                if oOldjson:Has(pcSerializename) then 
-                do:
-                    if oOldJson:GetType(pcSerializename) = JsonDataType:ARRAY then
-                    do:
-                       if oOldJson:GetJsonArray(pcSerializename):length = 1 then 
-                           oNewJson = oOldJson:GetJsonArray(pcSerializename):GetJsonObject(1). 
-                       else if oOldJson:GetJsonArray(pcSerializename):length = 0 then 
-                           oNewJson = ?.
-                       else         
-                           undo, throw new IllegalStateError(subst("The '&1' entity at the the end of the XRef relation cannot have more than one row",pcSerializename)).
-                    end.
-                    else 
-                       oNewJson = oOldJson:GetJsonObject(pcSerializename).
-                    if oNewJson <> ? then 
-                        oNewJsonArray:Add(oNewjson).
-                end.
-            end.     
-            pParentJson:set(pcSerializename,oNewJsonArray).     
-        end.    
-        else do:
-            oOldJson = pParentJson:GetJsonObject(pcSerializename).
-            if oOldJson:Has(pcSerializename) then
-            do:
-                if oOldJson:GetType(pcSerializename) = JsonDataType:ARRAY then
-                do:
-                   if oOldJson:GetJsonArray(pcSerializename):length = 1 then 
-                       oNewJson = oOldJson:GetJsonArray(pcSerializename):GetJsonObject(1). 
-                   else if oOldJson:GetJsonArray(pcSerializename):length = 0 then 
-                       oNewJson = ?.    
-                   else      
-                       undo, throw new IllegalStateError(subst("The '&1' entity at the the end of the XRef relation cannot have more than one row",pcSerializename)).
-                end.
-                else 
-                   oNewJson = oOldJson:GetJsonObject(pcSerializename).
-                
-                if oNewJson = ? then 
-                    pParentJson:setNull(pcSerializename).
-                else
-                    pParentJson:set(pcSerializename,oNewJson).    
-            end.
-            else
-               pParentJson:SetNull(pcSerializename).
-        end.
-        
-    end method.     
     
     method protected JsonObject WrapResponse(pJsonResponse as jsonObject, pDataset as handle,pRequestedBuffer as handle, pRequestType as RequestTypeEnum):
         define variable cReplaceName as character no-undo.
@@ -1562,12 +1552,13 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
                 end.             
            end.
         end.
+        
         if plUpdateResponse then
             lExtractTable = valid-handle(pRequestedBuffer).
             
         else if extent(pTableRequests) <> ? and valid-handle(pRequestedBuffer) then 
             lExtractTable = CheckTableRequestAndAssertUniqueParents(pDataset, pClientGetRequest, pTableRequests, pRequestedBuffer).
-           
+        
         if pSelectedFields > "" then do:
             hHiddenFlds = HideColumns(pDataset,if valid-handle(pRequestedBuffer) then pRequestedBuffer:name else "",pSelectedFields,pLinkCollection,pSelectedQueryName,plWriteBeforeImage, output cHideLaterFields).
         end.
@@ -1713,11 +1704,9 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
                          end.
                     end.
                 end.
+             
                 FlattenXRefLinks(JsonResponse,
-                                 if valid-handle(pRequestedBuffer) and valid-handle(pRequestedBuffer:parent-relation)
-                                 then pRequestedBuffer:parent-relation:parent-buffer:serialize-name 
-                                 else if valid-handle(pRequestedBuffer) then pRequestedBuffer:serialize-name
-                                 else "",
+                                 pRequestedBuffer,
                                  pLinkCollection).
             end.
         end.
@@ -1893,9 +1882,18 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
         
         if pAction:CompareFields = "" then 
         do:
-            if valid-object(pMessageBody) then 
+            if valid-object(pMessageBody) then
+            do:
+                if MethodBindingEnum:Entity:Equals(pAction:Binding) then 
+                    // Binding to Entity is only for exiting records 
+                    // If we want to support this with  Json we would only support JSON object 
+                    //  - this can be validated in line 1908 below
+                    //  - JsonReader would need to fixed to support this (not set created, but track changes?)  
+                    undo, throw new NotImplementedError("Support for Action with Binding to Entity and a JSON Body").
+             
                 return false.
-            else     
+            end.    
+            else if MethodBindingEnum:Entity:Equals(pAction:Binding) = false then 
                 undo, throw new UnprocessableEntityError(subst("'POST' request for action '&1' must have a valid json object body",pAction:name)).
         end.
               
@@ -1907,8 +1905,8 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
             hDataset = phDataset.
        
         oGetRequest = CreateRequestForUniqueAction(pClientUpdateRequest, hDataset, extent(pClientUpdateRequest:Collections) - 1).
-         
-        if valid-object(pMessageBody) then 
+        
+        if valid-object(pMessageBody) then //and MethodBindingEnum:Entity:Equals(pAction:Binding) = false then 
         do:
             oJsonBody  = cast(pMessageBody,JsonObject).
             oJsonConstruct = JsonUtil:GetRequestNode(oJsonBody,pRequestedBuffer,true).
@@ -1920,32 +1918,34 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
         
         else do: 
             oTableRequest = cast(oGetRequest:GetTableRequest(pRequestedBuffer:table-handle:name),Pmfo.Core.BusinessLogic.IGetDataTableRequest).
-            
-            cFieldReferences = oTableRequest:GetPredicateFieldReferences().
-            if valid-handle(pRequestedBuffer:parent-relation) then 
-            do iFld = 2 to num-entries(pRequestedBuffer:parent-relation:relation-fields) by 2:
-                // NOTE; We don't care about double entries as of current
-                cFieldReferences = cFieldReferences
-                                 + "," 
-                                 + entry(iFld,pRequestedBuffer:parent-relation:relation-fields).
-            end.    
-            // This is used for action and the record is marked as row -created
-            // We set TablRequest select, but this is typicaly ignored so blank out all fields that are not 
-            // requested to avoid anyone relying on the non-posted data in action logic 
-            // TODO - improve POST of action to handle existing records (which is the most common case)
-            do iFld = 1 to num-entries(pAction:CompareFields):
-                if lookup(entry(iFld,pAction:CompareFields),cFieldReferences) = 0 then
-                do:
-                    if valid-object(pMessageBody) then 
-                        return false.
-                    else     
-                        undo, throw new UnprocessableEntityError(subst("'POST' request for action '&1' must have a valid json object body",pAction:name)).
+            if MethodBindingEnum:Entity:Equals(pAction:Binding) = false then 
+            do:
+                cFieldReferences = oTableRequest:GetPredicateFieldReferences().
+                if valid-handle(pRequestedBuffer:parent-relation) then 
+                do iFld = 2 to num-entries(pRequestedBuffer:parent-relation:relation-fields) by 2:
+                    // NOTE; We don't care about double entries as of current
+                    cFieldReferences = cFieldReferences
+                                     + "," 
+                                     + entry(iFld,pRequestedBuffer:parent-relation:relation-fields).
                 end.    
-            end.     
-            // Note that most DS ignores this, but some may use it to improve performance  
-            oTableRequest:SelectFields = pAction:CompareFields .
-          
-           
+                
+                // This is used for action and the record is marked as row -created
+                // We set TablRequest select, but this is typicaly ignored so blank out all fields that are not 
+                // requested to avoid anyone relying on the non-posted data in action logic 
+                // TODO - improve POST of action to handle existing records (which is the most common case)
+                do iFld = 1 to num-entries(pAction:CompareFields):
+                    if lookup(entry(iFld,pAction:CompareFields),cFieldReferences) = 0 then
+                    do:
+                        if valid-object(pMessageBody) then 
+                            return false.
+                        else     
+                            undo, throw new UnprocessableEntityError(subst("'POST' request for action '&1' must have a valid json object body",pAction:name)).
+                    end.    
+                end.     
+                
+                // Note that most DS ignores this, but some may use it to improve performance  
+                oTableRequest:SelectFields = pAction:CompareFields .
+            end.
         end.
                  
         pBe:GetData(oGetRequest, output dataset-handle hDataset by-reference).
@@ -1966,20 +1966,31 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
         // HOWEVER if it is overriden then we have a conflict with the use of select for the case with no messagebody
         // so throw not implemented for now
         // TODO - could just not use select in that case, but should probalby add an option/prop to control this 
-        if not valid-object(pMessageBody) then 
+        if MethodBindingEnum:Entity:Equals(pAction:Binding) = false 
+        and valid-object(pMessageBody) = false
+        // if this is the main action class don't check since it will have the instance and declaredonly true   
+        and pAction:GetClass() <> get-class(Action) then 
         do:
-            define variable oParameterList as ParameterList no-undo.  
+            define variable oParameterList as ParameterList no-undo.
+              
             oParameterList = new ParameterList(1).
             oParameterList:setParameter(1,"handle","input",pRequestedBuffer).
-            if valid-object(pAction:GetClass():GetMethod ("PostFindUnique",Progress.Reflect.Flags:Public or Progress.Reflect.Flags:Instance,oParameterList)) then 
-                undo, throw new NotImplementedError("Action with PostFindUnique override for Action without body. This conflicts with default use of select to only return CompareFields for the data. Please Contact IT if this is needed.") .
+            if valid-object(pAction:GetClass():GetMethod ("PostFindUnique",
+                                                          Progress.Reflect.Flags:Public 
+                                                          or Progress.Reflect.Flags:Instance
+                                                          or Progress.Reflect.Flags:DeclaredOnly,
+                                                          oParameterList)
+                                                          ) then 
+                undo, throw new NotImplementedError("Action with PostFindUnique override for Action without body","This conflicts with default use of select to only return CompareFields for the data. Please Contact IT if this is needed.") .
         
         end. 
+        // default to do nothing for Binding to Entoty 
+        // otherwise will empty fields not listed in comparefields and set row-created also if isCreated false
         pAction:PostFindUnique(pRequestedBuffer).
         return true.                                                                                                                                                      
     end method.
     
-    method protected void GetParentRowsForDynamicChild(pBe as IBusinessEntity, pClientUpdateRequest as IClientUpdateRequest, phDataset as handle):
+    method protected void GetParentRowsForAction(pBe as IBusinessEntity, pClientUpdateRequest as IClientUpdateRequest, phDataset as handle):
         define variable oGetRequest      as IGetDataRequest no-undo. 
         oGetRequest = CreateRequestForUniqueAction(pClientUpdateRequest, phDataset, extent(pClientUpdateRequest:Collections) - 2).
         pBe:GetData(oGetRequest, output dataset-handle phDataset by-reference).
@@ -2045,8 +2056,8 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
                 end.
                 if valid-object(oJsonArray) and lOnlyKeys then 
                 do:
-                    // paranoia ? - we only get here if the first object only has kesys
-                    // so no vierhead for regular posts        
+                    // paranoia ? - we only get here if the first object only has keys
+                    // so no overhead for regular posts        
                     do i = 2 to oJsonArray:length: 
                         cChecknames = oJsonArray:GetJsonObject(i):GetNames().
                         if extent(cChecknames) <> extent(cNames) then
@@ -2131,14 +2142,14 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
                /* If there is no key for a prior(parent) table the request is likely wrong, but for this logic it works as long as it is unique
                   We could (in future allow just table in a URI if we know it is always unique in the context of its parent ()
                */    
-               
+             
                hBuffer:find-unique().
                
                catch e1 as NotFoundError :
                    undo, throw e1.
                end catch.
                catch e2 as Progress.Lang.Error :
-                  
+                 
                    // may happen if static DatasetUUtil is out of synch 
                    if not valid-handle(hBuffer) then
                        undo, throw e2. 

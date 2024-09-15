@@ -15,7 +15,7 @@ using OpenEdge.Core.Collections.IList from propath.
 using Pmfo.Core.BusinessLogic.IRequest from propath.
 using Pmfo.Core.Common.IGetDataQuestions from propath.
 
-interface Pmfo.Core.BusinessLogic.IGetDataRequest inherits IGetDataRequest, IRequest:  
+interface Pmfo.Core.BusinessLogic.IGetDataRequest inherits IGetDataRequest,  IRequest:  
     define public property HasWarnings  as logical no-undo get.
     define public property Warnings     as IList   no-undo get. set.
     define public property HasQuestions as logical no-undo get.   

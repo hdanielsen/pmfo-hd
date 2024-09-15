@@ -38,6 +38,7 @@ using Pmfo.Util.DatasetUtil from propath.
 using Pmfo.Util.QueryUtil from propath.
 using Pmfo.Util.ServiceInfo from propath.
 using Pmfo.Util.StringUtil from propath.
+using Pmfo.Core.BusinessLogic.QueryBuilder.QuerySearchQualifiedPredicateFields from propath.
  
 
 class Pmfo.Core.BusinessLogic.FindService implements IFindService: 
@@ -46,8 +47,11 @@ class Pmfo.Core.BusinessLogic.FindService implements IFindService:
         super ().
     end constructor.
 
-    method protected IBusinessEntity GetEntity(pcName as char):
-        return cast(cast(Application:ServiceManager,IServiceManager):CreateBusinessEntity(pcName),IBusinessEntity).
+    method protected IBusinessEntity GetEntity(pcName as char,plFast as logical ):
+        if plFast then
+            return cast(cast(Application:ServiceManager,IServiceManager):CreateBusinessEntityForTableRead(pcName),IBusinessEntity).
+        else    
+            return cast(cast(Application:ServiceManager,IServiceManager):CreateBusinessEntity(pcName),IBusinessEntity).
     end.
     
     method protected void AssertSingleKey(phbuffer as handle,pcKeyValue as char,pcKeys as character):
@@ -59,6 +63,10 @@ class Pmfo.Core.BusinessLogic.FindService implements IFindService:
         return CanFind(pcResource,string(piKeyValue)).
     end method.
     
+    method public logical CanFind(pcResource as character,pdKeyValue as decimal).
+        return CanFind(pcResource,string(pdKeyValue)).
+    end method.
+    
     method public logical CanFind(pcResource as character,pcKeyValue as character).
         define variable oEntity as IBusinessEntity no-undo.
         return CanFind(pcResource,pcKeyValue,output oEntity).
@@ -66,6 +74,10 @@ class Pmfo.Core.BusinessLogic.FindService implements IFindService:
     
     method public logical CanFind(pcResource as character,pcKeyName as char, piKeyValue as integer).
         return CanFind(pcResource,pcKeyName,string(piKeyValue)).
+    end method.
+    
+    method public logical CanFind(pcResource as character,pcKeyName as char, pdKeyValue as decimal).
+        return CanFind(pcResource,pcKeyName,string(pdKeyValue)).
     end method.
     
     method public logical CanFind(pcResource as character,pcKeyName as char, pcKeyValue as character).
@@ -84,40 +96,49 @@ class Pmfo.Core.BusinessLogic.FindService implements IFindService:
     end method.
     
      /***  can-find variations that returns the entity ****/
+    method public logical CanFind(pcResource as character,piKeyValue as integer, output pEntity as IBusinessEntity):
+        return CanFind(pcResource,string(piKeyValue), output pEntity).
+    end method.
+    
+    method public logical CanFind(pcResource as character,pdKeyValue as decimal, output pEntity as IBusinessEntity):
+        return CanFind(pcResource,string(pdKeyValue), output pEntity).
+    end method.
        
     method public logical CanFind(pcResource as character,pcKeyValue as character, output pEntity as IBusinessEntity):
         define variable hBuffer as handle no-undo.
         define variable cKeys as character no-undo.
-        pEntity = PrepareResource(pcResource, output hBuffer).
+        pEntity = PrepareResource(pcResource, 
+                                  false, // cannot use fast option if BE is returned 
+                                  output hBuffer).
         cKeys = ServiceInfo:GetKeys(hBuffer).
         AssertSingleKey(hBuffer,pcKeyValue,cKeys).
         return CanFind(pEntity,hBuffer,Array:ToArray(cKeys),Array:toArray(pcKeyValue)).
     end method.
     
-    method public logical CanFind(pcResource as character,piKeyValue as integer, output pEntity as IBusinessEntity):
-        return CanFind(pcResource,string(piKeyValue), output pEntity).
-    end method.
-    
     method public logical CanFind(pcResource as character,pcKeyName as char, piKeyValue as integer, output pEntity as IBusinessEntity).
         return CanFind(pcResource,pcKeyName,string(piKeyValue), output pEntity). 
+    end method.
+    
+    method public logical CanFind(pcResource as character,pcKeyName as char, pdKeyValue as decimal, output pEntity as IBusinessEntity).
+        return CanFind(pcResource,pcKeyName,string(pdKeyValue), output pEntity). 
     end method.
         
     method public logical CanFind(pcResource as character,pcKeyName as char, pcKeyValue as character, output pEntity as IBusinessEntity).
         define variable hBuffer as handle no-undo.
-        pEntity = PrepareResource(pcResource, output hBuffer). 
+        pEntity = PrepareResource(pcResource,false, output hBuffer). 
         return CanFind(pEntity,hBuffer,Array:ToArray(pcKeyName),Array:toArray(pcKeyValue)). 
     end method.
     
     method public logical CanFind(pcResource as character,pcKeyNames as char extent, pcKeyValues as character extent, output pEntity as IBusinessEntity).
         define variable hBuffer as handle no-undo.
-        pEntity = PrepareResource(pcResource, output hBuffer). 
+        pEntity = PrepareResource(pcResource, false, output hBuffer). 
         return CanFind(pEntity,hBuffer,pcKeyNames,pcKeyValues). 
     end method.
     
     method public logical CanFind(pcResource as character,pQueryEntry as IQueryEntry,output pEntity as IBusinessEntity).
         define variable hBuffer as handle no-undo.
         define variable oGetRequest as IGetDataRequest no-undo.
-        pEntity = PrepareResource(pcResource, output hBuffer).
+        pEntity = PrepareResource(pcResource, false, output hBuffer).
         oGetRequest = GetFindRequest(hBuffer,pQueryEntry).  
         return Execute(pEntity,oGetRequest,hbuffer).
         catch e as TableNotFoundError:
@@ -138,6 +159,10 @@ class Pmfo.Core.BusinessLogic.FindService implements IFindService:
         return CanFindFirst(pcResource,pcFieldName,string(piFieldValue)).   
     end method.
     
+    method public logical CanFindFirst(pcResource as character,pcFieldName as char, pdFieldValue as decimal).
+        return CanFindFirst(pcResource,pcFieldName,string(pdFieldValue)).   
+    end method.
+    
     method public logical CanFindFirst(pcResource as character,pcFieldName as char, pcFieldValue as character).
         return CanFindFirst(pcResource,Array:ToArray(pcFieldName),Array:toArray(pcFieldValue)).
     end method.
@@ -145,7 +170,7 @@ class Pmfo.Core.BusinessLogic.FindService implements IFindService:
     method public logical CanFindFirst(pcResource as character,pcFieldNames as char extent, pcFieldValues as character extent).
         define variable hBuffer as handle no-undo.
         define variable oEntity as IBusinessEntity no-undo.
-        oEntity = PrepareResource(pcResource, output hBuffer).
+        oEntity = PrepareResource(pcResource, true, output hBuffer).
         return CanFindFirst(oEntity,hBuffer,pcFieldNames,pcFieldValues).
     end method.
     
@@ -154,7 +179,7 @@ class Pmfo.Core.BusinessLogic.FindService implements IFindService:
         define variable oGetRequest as IGetDataRequest no-undo.
         define variable cKeys as character no-undo.
         define variable oEntity as IBusinessEntity no-undo.
-        oEntity = PrepareResource(pcResource, output hBuffer).
+        oEntity = PrepareResource(pcResource, true, output hBuffer).
         cKeys = oEntity:GetKeys().
         if cKeys <> "rowid" and cKeys > "" then
            oGetRequest = GetFindRequest(hBuffer,pQueryEntry,cKeys). //keys for select
@@ -174,16 +199,19 @@ class Pmfo.Core.BusinessLogic.FindService implements IFindService:
         end catch.
     end method.
     
-     
     method public void AssertFind(pcResource as character,piKeyValue as integer).
         AssertFind(pcResource,string(piKeyValue)).
+    end method.
+    
+    method public void AssertFind(pcResource as character,pdKeyValue as decimal).
+        AssertFind(pcResource,string(pdKeyValue)).
     end method.
     
     method public void AssertFind(pcResource as character,pcKeyValue as character).
         define variable oEntity as IBusinessEntity no-undo.
         define variable hBuffer as handle no-undo.
         define variable cKeys as character no-undo.
-        oEntity = PrepareResource(pcResource, output hBuffer).
+        oEntity = PrepareResource(pcResource, true, output hBuffer).
         cKeys = ServiceInfo:GetKeys(hBuffer).
         AssertSingleKey(hBuffer,pcKeyValue,cKeys).
         AssertFind(oEntity,hBuffer,Array:ToArray(cKeys),Array:toArray(pcKeyValue)).
@@ -192,7 +220,7 @@ class Pmfo.Core.BusinessLogic.FindService implements IFindService:
     method public void AssertFind(pcResource as character,pcKeyName as char, pcKeyValue as character).
         define variable oEntity as IBusinessEntity no-undo.
         define variable hBuffer as handle no-undo.
-        oEntity = PrepareResource(pcResource, output hBuffer). 
+        oEntity = PrepareResource(pcResource, true, output hBuffer). 
         AssertFind(oEntity,hBuffer,Array:ToArray(pcKeyName),Array:toArray(pcKeyValue)). 
     end method.
     
@@ -200,10 +228,14 @@ class Pmfo.Core.BusinessLogic.FindService implements IFindService:
         AssertFind(pcResource,pcKeyName,string(piKeyValue)).
     end method.
     
+    method public void AssertFind(pcResource as character,pcKeyName as char, pdKeyValue as decimal).
+        AssertFind(pcResource,pcKeyName,string(pdKeyValue)).
+    end method.
+    
     method public void AssertFind(pcResource as character,pcKeyNames as char extent, pcKeyValues as character extent).
         define variable oEntity as IBusinessEntity no-undo.
         define variable hBuffer as handle no-undo.
-        oEntity = PrepareResource(pcResource, output hBuffer). 
+        oEntity = PrepareResource(pcResource, true, output hBuffer). 
         AssertFind(oEntity,hBuffer,pcKeyNames,pcKeyValues). 
     end method.
     
@@ -211,7 +243,7 @@ class Pmfo.Core.BusinessLogic.FindService implements IFindService:
         define variable oEntity as IBusinessEntity no-undo.
         define variable hBuffer as handle no-undo.
         define variable oGetRequest as IGetDataRequest no-undo.
-        oEntity = PrepareResource(pcResource, output hBuffer).
+        oEntity = PrepareResource(pcResource, true, output hBuffer).
         oGetRequest = GetFindRequest(hBuffer,pQueryEntry).
         Execute(oEntity,oGetRequest,hbuffer).    
     end method.
@@ -227,12 +259,20 @@ class Pmfo.Core.BusinessLogic.FindService implements IFindService:
         return FindValue(pcResource,piKeyValue,"description").   
     end method.
     
+    method public character FindDescription( input pcResource as character, input pdKeyValue as decimal ):
+        return FindValue(pcResource,pdKeyValue,"description").   
+    end method.
+    
     method public character FindDescription( input pcResource as character, input pcKeyValue as character ):
         return FindValue(pcResource,pcKeyValue,"description").   
     end method.
     
     method public character FindDescription( input pcResource as character, input pcFieldName as character, input piKeyValue as integer ):
         return FindValue(pcResource,pcFieldName,piKeyValue,"description").   
+    end method.
+    
+    method public character FindDescription( input pcResource as character, input pcFieldName as character, input pdKeyValue as decimal ):
+        return FindValue(pcResource,pcFieldName,pdKeyValue,"description").   
     end method.
     
     method public character FindDescription( input pcResource as character, input pcFieldName as character,input pcKeyValue as character ):
@@ -247,16 +287,26 @@ class Pmfo.Core.BusinessLogic.FindService implements IFindService:
         return FindValue(pcResource,pQueryEntry,"description").
     end method.
     
-    method public character FindName( input pcResource as character, input pcKeyValue as character ):
-        return FindValue(pcResource,pcKeyValue,"name").   
-    end method.
     
     method public character FindName( input pcResource as character, input piKeyValue as integer ):
         return FindValue(pcResource,piKeyValue,"name").   
     end method.
     
+    method public character FindName( input pcResource as character, input pdKeyValue as decimal ):
+        return FindValue(pcResource,pdKeyValue,"name").   
+    end method.
+    
+    method public character FindName( input pcResource as character, input pcKeyValue as character ):
+        return FindValue(pcResource,pcKeyValue,"name").   
+    end method.
+    
+    
     method public character FindName( input pcResource as character, input pcFieldName as character, input piKeyValue as integer ):
         return FindValue(pcResource,pcFieldName,piKeyValue,"name").   
+    end method.
+    
+    method public character FindName( input pcResource as character, input pcFieldName as character, input pdKeyValue as decimal ):
+        return FindValue(pcResource,pcFieldName,pdKeyValue,"name").   
     end method.
     
     method public character FindName( input pcResource as character, input pcFieldName as character,input pcKeyValue as character ):
@@ -275,11 +325,15 @@ class Pmfo.Core.BusinessLogic.FindService implements IFindService:
         return FindValue(pcResource,string(piKeyValue),pcField).   
     end method.
     
+    method public character FindValue( input pcResource as character, input pdKeyValue as decimal, input pcField as character ):
+        return FindValue(pcResource,string(pdKeyValue),pcField).   
+    end method.
+    
     method public character FindValue( input pcResource as character, input pcKeyValue as character, input pcFieldName as character ):
         define variable oEntity as IBusinessEntity no-undo.
         define variable hBuffer as handle no-undo.
         define variable cKeys as character no-undo.
-        oEntity = PrepareResource(pcResource, output hBuffer).
+        oEntity = PrepareResource(pcResource, true, output hBuffer).
         cKeys = ServiceInfo:GetKeys(hBuffer).
         if cKeys = "" then 
             undo, throw new IllegalStateError(subst("Cannot find '&1' row with key value &2. The table does not have a key.",BufferUtil:GetRowName(hBuffer),pcKeyValue)).
@@ -293,10 +347,15 @@ class Pmfo.Core.BusinessLogic.FindService implements IFindService:
          return FindValue(pcResource,pcKeyFieldName,string(piKeyValue),pcFieldName).  
     end method.
     
+    method public character FindValue( input pcResource as character, input pcKeyFieldName as character, input pdKeyValue as decimal, input pcFieldName as character ):
+         return FindValue(pcResource,pcKeyFieldName,string(pdKeyValue),pcFieldName).  
+    end method.
+    
+    
     method public character FindValue( input pcResource as character, input pcKeyFieldName as char, input pcKeyValue as character, input pcFieldName as character ):
         define variable oEntity as IBusinessEntity no-undo.
         define variable hBuffer as handle no-undo.
-        oEntity = PrepareResource(pcResource, output hBuffer). 
+        oEntity = PrepareResource(pcResource, true, output hBuffer). 
         return FindValue(oEntity,hBuffer,Array:ToArray(pcKeyFieldName),Array:toArray(pcKeyValue),pcFieldName). 
     end method.
     
@@ -309,11 +368,21 @@ class Pmfo.Core.BusinessLogic.FindService implements IFindService:
         end. 
         return FindValue(pcResource,pcKeyFieldNames,cValues,pcFieldName). 
     end method.
+   
+    method public character FindValue( input pcResource as character, input pcKeyFieldNames as char extent, input pdKeyValues as decimal extent, input pcFieldName as character ):
+        define variable cValues as character extent no-undo.
+        define variable i as integer no-undo.
+        extent(cValues) = extent(pdKeyValues).
+        do i = 1 to extent(cValues): 
+            cValues[i] = string(pdKeyValues[i]). 
+        end. 
+        return FindValue(pcResource,pcKeyFieldNames,cValues,pcFieldName). 
+    end method.
     
     method public character FindValue( input pcResource as character, input pcKeyFieldNames as char extent, input pcKeyValues as character extent, input pcFieldName as character ):
         define variable oEntity as IBusinessEntity no-undo.
         define variable hBuffer as handle no-undo.
-        oEntity = PrepareResource(pcResource, output hBuffer). 
+        oEntity = PrepareResource(pcResource, true, output hBuffer). 
         return FindValue(oEntity,hBuffer,pcKeyFieldNames,pcKeyValues,pcFieldName). 
     end method.
     
@@ -327,13 +396,19 @@ class Pmfo.Core.BusinessLogic.FindService implements IFindService:
         define variable oEntity as IBusinessEntity no-undo.
         define variable hBuffer as handle no-undo.
         define variable oGetRequest as IGetDataRequest no-undo.
-        oEntity = PrepareResource(pcResource, output hBuffer).
+        define variable lFast as logical no-undo.
+        lFast = QueryHasNoOtherTablereferences(pQueryEntry).
+        oEntity = PrepareResource(pcResource, lFast, output hBuffer).
         oGetRequest = GetFindRequest(hBuffer,pQueryEntry,pcfieldname).
         return Execute(oEntity,oGetRequest,hBuffer,pcFieldName).   
     end method.
     
     method public character extent FindValues( input pcResource as character, input piKeyValue as integer, input pcFieldNames as character extent ):
          return FindValues(pcResource,string(piKeyValue),pcFieldNames).
+    end method.
+    
+    method public character extent FindValues( input pcResource as character, input pdKeyValue as decimal, input pcFieldNames as character extent ):
+         return FindValues(pcResource,string(pdKeyValue),pcFieldNames).
     end method.
     
     method public character extent FindValues( input pcResource as character, input pcKeyValue as character, input pcFieldNames as character extent ):
@@ -344,12 +419,20 @@ class Pmfo.Core.BusinessLogic.FindService implements IFindService:
         define variable cKeyValues   as character extent 1 no-undo.
        
         cKeyValues[1] = pcKeyValue.
-        oEntity = PrepareResource(pcResource, output hBuffer). 
+        oEntity = PrepareResource(pcResource, true, output hBuffer). 
         cKeyString = ServiceInfo:GetKeys(hBuffer).
         if num-entries(cKeyString) > 1 then 
             undo, throw new IllegalOperationError(subst("Cannot find '&1' row with single value '&2'. A value must be specified for all key fields: &3",BufferUtil:GetRowName(hBuffer),pcKeyValue,StringUtil:GetMessageFromEntries(cKeyString))).
         cKeys[1] = cKeyString.
         return FindValues(oEntity,hBuffer,cKeys,cKeyValues,pcFieldNames).
+    end method.
+    
+    method public character extent FindValues( input pcResource as character, input pcKeyFieldName as character , input piKeyValue as integer, input pcFieldNames as character extent ):
+        return FindValues(pcResource,pcKeyFieldName,string(piKeyValue),pcFieldNames).
+    end method.
+    
+    method public character extent FindValues( input pcResource as character, input pcKeyFieldName as character , input pdKeyValue as decimal, input pcFieldNames as character extent ):
+        return FindValues(pcResource,pcKeyFieldName,string(pdKeyValue),pcFieldNames).
     end method.
      
     method public character extent FindValues( input pcResource as character, input pcKeyFieldName as character , input pcKeyValue as character, input pcFieldNames as character extent ):
@@ -360,13 +443,10 @@ class Pmfo.Core.BusinessLogic.FindService implements IFindService:
         cKey[1] = pcKeyFieldName.
         cKeyValue[1] = pcKeyValue.
         
-        oEntity = PrepareResource(pcResource, output hBuffer). 
+        oEntity = PrepareResource(pcResource, true, output hBuffer). 
         return FindValues(oEntity,hBuffer,cKey,cKeyValue,pcFieldNames).
     end method.
     
-    method public character extent FindValues( input pcResource as character, input pcKeyFieldName as character , input piKeyValue as integer, input pcFieldNames as character extent ):
-        return FindValues(pcResource,pcKeyFieldName,string(piKeyValue),pcFieldNames).
-    end method.
     
     method public character extent FindValues(pcResource as character,pcKeys as char extent, piKeyValues as integer extent,pcFieldNames as character extent).
         define variable cValues as character extent no-undo.
@@ -377,18 +457,30 @@ class Pmfo.Core.BusinessLogic.FindService implements IFindService:
         end. 
         return FindValues(pcResource, pcKeys, cValues, pcFieldNames).
     end method.
+    
+    method public character extent FindValues(pcResource as character,pcKeys as char extent, pdKeyValues as decimal extent,pcFieldNames as character extent).
+        define variable cValues as character extent no-undo.
+        define variable i as integer no-undo.
+        extent(cValues) = extent(pdKeyValues).
+        do i = 1 to extent(cValues): 
+            cValues[i] = string(pdKeyValues[i]). 
+        end. 
+        return FindValues(pcResource, pcKeys, cValues, pcFieldNames).
+    end method.
         
     method public character extent FindValues( input pcResource as character, input pcKeyFieldNames as character extent, input pcKeyValues as character extent, input pcFieldNames as character extent ):
         define variable oEntity as IBusinessEntity no-undo.
         define variable hBuffer as handle no-undo.
-        oEntity = PrepareResource(pcResource, output hBuffer). 
+        oEntity = PrepareResource(pcResource, true, output hBuffer). 
         return FindValues(oEntity,hBuffer,pcKeyFieldNames,pcKeyValues,pcFieldNames).
     end method.
     
     method public character extent FindValues(pcResource as character,pQueryEntry as IQueryEntry,pcFieldNames as character extent).
         define variable oEntity as IBusinessEntity no-undo.
         define variable hBuffer as handle no-undo.
-        oEntity = PrepareResource(pcResource, output hBuffer). 
+        define variable lFast as logical no-undo.
+        lFast = QueryHasNoOtherTablereferences(pQueryentry).
+        oEntity = PrepareResource(pcResource, lFast, output hBuffer). 
         return FindValues(oEntity,hBuffer,pQueryEntry,pcFieldNames).
     end method. 
     
@@ -407,6 +499,17 @@ class Pmfo.Core.BusinessLogic.FindService implements IFindService:
     
     method public logical FindTable( input pcResource as character, input piKeyValue as integer,output table-handle phTable):
         return FindTable(pcResource,string(piKeyValue), output table-handle phTable by-reference).
+        finally:
+            // if called wothoiut by-reference the by-reference on the call above is not by-reference but a deep copy 
+            if valid-object(phTable) then
+            do:
+                delete object phTable.
+            end.     
+        end.
+    end method.
+    
+    method public logical FindTable( input pcResource as character, input pdKeyValue as decimal,output table-handle phTable):
+        return FindTable(pcResource,string(pdKeyValue), output table-handle phTable by-reference).
         finally:
             // if called wothoiut by-reference the by-reference on the call above is not by-reference but a deep copy 
             if valid-object(phTable) then
@@ -479,6 +582,52 @@ class Pmfo.Core.BusinessLogic.FindService implements IFindService:
         end.
     end method.
     
+    method public logical FindTable( input pcResource as character, input pcKeyFieldName as character , input pdKeyValue as decimal,output table-handle phTable):
+        return FindTable(pcResource,pcKeyFieldName,string(pdKeyValue),output table-handle phTable by-reference).
+        finally:
+            // if called without by-reference the by-reference on the call above is not by-reference but a deep copy 
+            if valid-object(phTable) then
+            do:
+                delete object phTable.
+            end.     
+        end.
+    end method.
+    
+    method public logical FindTable( input pcResource as character, input pcKeyFieldNames as character extent, input piKeyValues as integer extent,output table-handle phTable):
+        define variable cValues as character extent no-undo.
+        define variable i as integer no-undo.
+        extent(cValues) = extent(piKeyValues).
+        do i = 1 to extent(cValues): 
+            cValues[i] = string(piKeyValues[i]). 
+        end. 
+        return FindTable(input pcResource, input pcKeyFieldNames, input cValues, output table-handle phTable by-reference).
+        finally:
+            // if called without by-reference the by-reference on the call above is not by-reference but a deep copy 
+            if valid-object(phTable) then
+            do:
+                delete object phTable.
+            end.     
+        end.   
+    end method.
+    
+    method public logical FindTable( input pcResource as character, input pcKeyFieldNames as character extent, input pdKeyValues as decimal extent,output table-handle phTable):
+        define variable cValues as character extent no-undo.
+        define variable i as integer no-undo.
+        extent(cValues) = extent(pdKeyValues).
+        do i = 1 to extent(cValues): 
+            cValues[i] = string(pdKeyValues[i]). 
+        end. 
+        return FindTable(input pcResource, input pcKeyFieldNames, input cValues, output table-handle phTable by-reference).
+        finally:
+            // if called without by-reference the by-reference on the call above is not by-reference but a deep copy 
+            if valid-object(phTable) then
+            do:
+                delete object phTable.
+            end.     
+        end.   
+    end method.
+    
+    
     method public logical FindTable( input pcResource as character, input pcKeyFieldNames as character extent, input pcKeyValues as character extent,output table-handle phTable):
         define variable oEntity as IBusinessEntity no-undo.
         define variable hBuffer as handle no-undo.
@@ -498,22 +647,6 @@ class Pmfo.Core.BusinessLogic.FindService implements IFindService:
         end.    
     end method.
     
-    method public logical FindTable( input pcResource as character, input pcKeyFieldNames as character extent, input piKeyValues as integer extent,output table-handle phTable):
-        define variable cValues as character extent no-undo.
-        define variable i as integer no-undo.
-        extent(cValues) = extent(piKeyValues).
-        do i = 1 to extent(cValues): 
-            cValues[i] = string(piKeyValues[i]). 
-        end. 
-        return FindTable(input pcResource, input pcKeyFieldNames, input cValues, output table-handle phTable by-reference).
-        finally:
-            // if called without by-reference the by-reference on the call above is not by-reference but a deep copy 
-            if valid-object(phTable) then
-            do:
-                delete object phTable.
-            end.     
-        end.   
-    end method.
     
     method public logical FindTable( input pcResource as character, input pQueryEntry as IQueryEntry, output table-handle phTable).
         define variable oEntity as IBusinessEntity no-undo.
@@ -539,11 +672,12 @@ class Pmfo.Core.BusinessLogic.FindService implements IFindService:
         do:
             phTable:empty-temp-table ().
             phBuffer = phTable:default-buffer-handle.
-            oEntity = GetEntity(pcResource, phBuffer).
+            // ? 
+            oEntity = GetEntity(pcResource, true, phBuffer).
             pByRef  = true.
         end.
         else do:
-            oEntity = PrepareResource(pcResource, output phBuffer). 
+            oEntity = PrepareResource(pcResource, true, output phBuffer). 
         end.
         return oEntity. 
     end method.    
@@ -688,10 +822,10 @@ class Pmfo.Core.BusinessLogic.FindService implements IFindService:
         return new GetDataRequest(pTableRequest).
     end method.      
         
-    method protected IBusinessEntity PrepareResource( input pcResource as character, output phBuffer as handle ):
+    method protected IBusinessEntity PrepareResource( input pcResource as character, input plFast as logical, output phBuffer as handle ):
         define variable oEntity as IBusinessEntity no-undo.
         define variable hDataset as handle no-undo.
-        oEntity = GetEntity(pcResource). 
+        oEntity = GetEntity(pcResource,plFast). 
         hDataset = oEntity:Datasets[1].
         if hDataset:serialize-name <> pcResource then 
             undo, throw new IllegalOperationError(subst("Cannot find row with key in Resource '&1'",pcResource)).
@@ -703,10 +837,10 @@ class Pmfo.Core.BusinessLogic.FindService implements IFindService:
     
     end method.
     
-    method protected IBusinessEntity GetEntity( input pcResource as character, input phbuffer as handle ):
+    method protected IBusinessEntity GetEntity( input pcResource as character, input plFast as logical, input phbuffer as handle ):
         define variable oEntity as IBusinessEntity no-undo.
         define variable hDataset as handle no-undo.
-        oEntity = GetEntity(pcResource). 
+        oEntity = GetEntity(pcResource,plFast). 
         hDataset = oEntity:Datasets[1].
         if hDataset:serialize-name <> pcResource then 
             undo, throw new IllegalOperationError(subst("Cannot find row with key in Resource '&1'",pcResource)).
@@ -720,7 +854,14 @@ class Pmfo.Core.BusinessLogic.FindService implements IFindService:
         return oEntity.
     
     end method.
-    
+   
+    method protected logical QueryHasNoOtherTablereferences(pQueryentry as IQueryentry):
+        define variable lFast as logical no-undo.
+        define variable oQuerySearch as QuerySearchQualifiedPredicateFields no-undo.
+        oQuerySearch  = new QuerySearchQualifiedPredicateFields().
+        oQuerySearch:Traverse(pQueryEntry).
+        return oQuerySearch:TableReferences = "".  
+    end method.            
     
     
 end class.

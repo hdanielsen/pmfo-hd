@@ -27,6 +27,9 @@ using Pmfo.Util.PrimitiveHolderUtil from propath.
 using Progress.Lang.Object from propath.
 using Progress.Lang.ParameterList from propath.
 using Pmfo.Core.Error.IllegalOperationError from propath.
+using Pmfo.Core.BusinessLogic.IBusinessEntity from propath.
+using Ccs.BusinessLogic.INamedQueryParameter from propath.
+using Pmfo.Util.StringUtil from propath.
 
 class Pmfo.Core.BusinessLogic.GetDataRequest  implements IGetDataRequest: 
      define public property HasWarnings as logical no-undo get. protected set.
@@ -209,7 +212,7 @@ class Pmfo.Core.BusinessLogic.GetDataRequest  implements IGetDataRequest:
     method public Progress.Reflect.Method GetClientMethod(pObject as Object, phDataset as handle,output pClientParameterList as ParameterList):
         define variable oTableRequest as IGetDataTableRequest no-undo.
         define variable oNamedQuery as INamedQuery no-undo.
-       
+        define variable oMethod as Progress.Reflect.Method no-undo.
         if MainRequestedBuffer > "" then
         do: 
             oTableRequest = GetTableRequest(phDataset:get-buffer-handle(MainRequestedBuffer)).
@@ -218,16 +221,43 @@ class Pmfo.Core.BusinessLogic.GetDataRequest  implements IGetDataRequest:
             do:
                 oNamedQuery = cast(oTableRequest,Pmfo.Core.BusinessLogic.IGetDataTableRequest):NamedQuery.
                 if valid-object(oNamedQuery)  then
-                    return GetClientMethod(oNamedQuery,pObject,phDataset, output pClientParameterList).
+                    oMethod = GetClientMethod(oNamedQuery,pObject,phDataset, output pClientParameterList).
             end.
         end.
         else do:
            oNamedQuery = NamedQuery.
            if valid-object(oNamedQuery)  then
-               return GetClientMethod(oNamedQuery,pObject,phDataset, output pClientParameterList).
-        end.    
-        return ?.    
+               oMethod = GetClientMethod(oNamedQuery,pObject,phDataset, output pClientParameterList).
+        end.   
+        // if client only then there must be a method in the BE
+        if valid-object(oNamedQuery) and not valid-object(oMethod) then 
+        do:  
+            if type-of(pObject,IBusinessEntity) and cast(pObject,IBusinessEntity):ClientOnly then
+            do: 
+                undo, throw new IllegalStateError(subst("Function &1&2 was not found in client only resource &3",
+                                                         oNamedQuery:Name,
+                                                         if extent(oNamedQuery:Parameters) > 0 then
+                                                            subst("(&1)",GetParametersAsString(oNamedQuery:Parameters))  
+                                                         else "",   
+                                                         cast(pObject,IBusinessEntity):Resource
+                                                        )
+                                                   ). 
+            end.   
+        end. 
+        return oMethod.    
     end method.
+    
+    method protected character GetParametersAsString(pParameters as INamedQueryParameter extent):
+        define variable i as integer no-undo.
+        define variable cSignatureAsString as character no-undo.
+        do i = 1 to extent(pParameters):
+           cSignatureAsString = StringUtil:AppendEntry(cSignatureAsString,
+                                                       pParameters[i]:name  
+                                                       ). 
+        end. 
+        return cSignatureAsString.     
+    end method.    
+    
     
     method protected Progress.Reflect.Method GetClientMethod(pNamedQuery as INamedQuery, pObject as Object, phDataset as handle,output pClientParameterList as ParameterList): 
         define variable i as integer no-undo. 
@@ -299,8 +329,9 @@ class Pmfo.Core.BusinessLogic.GetDataRequest  implements IGetDataRequest:
             oMethod = pObject:GetClass():GetMethod(pNamedQuery:Name,Progress.Reflect.Flags:Public or Progress.Reflect.Flags:Instance, pClientParameterList).
             if valid-object(oMethod) then 
             do: 
-                return oMethod.  
-            end. 
+               return oMethod.  
+            end.
+            
         end.
         // now check if  there is a general one (no paramters or it may get paramtwrs from the request 
         pClientParameterList = new ParameterList(2).
@@ -313,6 +344,7 @@ class Pmfo.Core.BusinessLogic.GetDataRequest  implements IGetDataRequest:
         do: 
             return oMethod.  
         end.
+         
     end method.   
     
     method public void RemoveNamedQuery().

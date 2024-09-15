@@ -34,5 +34,6 @@ interface Pmfo.Core.BusinessLogic.IServiceEntity inherits IEntity:
      
     // Reurn supported Web method - needed for entitites that support both POST and  GET 
     method public character MethodOperationType(pcMethodName as character).  
-    
+    // allow resolving public params from Method
+    method public character GetPublicParameterName(pcName as character).
 end interface.

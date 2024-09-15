@@ -114,7 +114,6 @@ class Pmfo.Core.BusinessLogic.Delegate.FetchDelegate implements IFetchDelegate:
              // was discarded since it did not resolve how to return it in a spearate output parameter)
               
             oGetResponse = pDataAccess:FetchData(poRequest, input-output dataset-handle phdataset).
-             
             if poRequest:MainRequestedBuffer > "" then 
             do:
                // If there are server joins disable the relations to avoid the empty json arrya in the repsonse  
