@@ -27,7 +27,9 @@ class Pmfo.Tools.Gui.View.FieldBrowse inherits Browse:
                 FieldData.FieldName     format "x(50)" width 29.15
                 FieldData.dataType      format "x(9)" 
                 FieldData.inSDO         column-label "In SDO" view-as toggle-box 
-                FieldData.isCalc        column-label "Calc" view-as toggle-box 
+                FieldData.isJoin        column-label "Join" view-as toggle-box 
+                FieldData.isCalc        column-label "Calc" view-as toggle-box
+                 
         enable FieldData.isExcluded FieldData.serializeName        
         WITH NO-ROW-MARKERS SEPARATORS  
         27 DOWN

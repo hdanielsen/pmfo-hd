@@ -22,6 +22,8 @@ using Pmfo.Core.Common.GetDataQuestions from propath.
 using Pmfo.Core.Common.IGetDataQuestions from propath.
 using Pmfo.Core.Error.IllegalOperationError from propath.
 using Pmfo.Util.Array from propath.
+using Pmfo.Core.Common.IGetDataMessages from propath.
+using Pmfo.Core.Common.GetDataMessages from propath.
 
 class Pmfo.Core.BusinessLogic.GetDataResponse inherits GetDataResponse implements IGetDataResponse: 
     define private variable mTables as character no-undo.
@@ -38,7 +40,15 @@ class Pmfo.Core.BusinessLogic.GetDataResponse inherits GetDataResponse implement
             return MetaDataEnum.    
         end. 
         set. 
-        
+    
+     define public property Messages as IGetDataMessages  no-undo 
+        get():
+            if not valid-object(Messages) then 
+                Messages = new GetDataMessages().
+            return Messages.    
+        end.    
+        protected set.
+            
     // Optionally specify CSV of serializeClientGetRequest and BusinessEntityOperationHandler
     // Fields in children of the requested table must be qualified
     define public property Select              as character no-undo get. set.

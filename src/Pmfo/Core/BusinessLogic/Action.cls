@@ -29,14 +29,18 @@ using Progress.Lang.ParameterList from propath.
 using Pmfo.Core.BusinessLogic.RequestTypeEnum from propath.
 using Pmfo.Core.Service.IClientUpdateRequest from propath.
 using Pmfo.Core.Service.IClientRequest from propath.
- 
+using Pmfo.Core.Error.IllegalOperationError from propath.
+using Pmfo.Core.Error.NotImplementedError from propath.
+using Pmfo.Core.BusinessLogic.MethodBindingEnum from propath. 
+using OpenEdge.Core.Assert from propath.
 
 class Pmfo.Core.BusinessLogic.Action inherits Method implements IAction: 
     define public override property BaseTypeName  as character no-undo init "Action" get.
- 
+    
     //  return @success if successful. Row type is currently used to create message text
     define public property SuccessRowState as RowStateEnum no-undo get. set.
-      
+    define variable mIsCreateFalse as logical no-undo. // log if actively set to false  
+    define variable mIsCreateTrue  as logical no-undo. // log if actively set to true  
     define public property ActionScope as ActionScopeEnum no-undo
         get():
             if not valid-object(ActionScope) then
@@ -45,8 +49,7 @@ class Pmfo.Core.BusinessLogic.Action inherits Method implements IAction:
         end.
         set. 
     
-    /*** need some thought -     
-    define public override property Binding    as MethodBindingEnum no-undo 
+    define public override property Binding as MethodBindingEnum no-undo 
         get():
             if not valid-object(Binding) then 
                 // Default any - both single entoty and collection
@@ -56,10 +59,21 @@ class Pmfo.Core.BusinessLogic.Action inherits Method implements IAction:
         set(pBinding as MethodBindingEnum):
             if isCreated then 
                 undo, throw new IllegalOperationError("Cannot set Binding after the action has been invoked").
+            //  as of current no check for this
+            //  - Could possibly be sued to disallow keys in URL if that has any value
+            //    but we cannot really require more than one record in the body 
+            //   (very rare (if ever?) that an action requires more than one recordand so probably no point in handling this way)
+            //    disallowing an object probably does not make sense either if thearray can have only one      
+            if MethodBindingEnum:Collection:Equals(pBinding) then 
+                undo, throw new NotImplementedError("Action Binding to Collection").
+                
+            if mIsCreateTrue then
+                 undo, throw new IllegalOperationError("Cannot set Binding to Entity when isCreate has been actively set to true"). 
+            
             Binding = pBinding.    
         end set.     
-     **/   
-       // optional CSV of temp-table (entity) field names to use to check optimistic locking. 
+        
+    // optional CSV of temp-table (entity) field names to use to check optimistic locking. 
     // This allows request to post a subset of data  
     define public property CompareFields as character no-undo get. set. 
     
@@ -68,8 +82,31 @@ class Pmfo.Core.BusinessLogic.Action inherits Method implements IAction:
     define public property BeforeImageRequired as logical no-undo get. set. 
    
      // Set to true for actions that have new data that is to be created (default false)   
-    define public property IsCreate     as logical no-undo get. set.
-    
+    define public property IsCreate     as logical no-undo 
+        get. 
+        set(plCreate as logical):
+          
+            // throw error if setting to false ans isEmpty is true
+            mIsCreateFalse = plCreate = false.
+            mIscreateTrue  = plCreate = true.
+            isCreate =plCreate.
+            AssertIsCreate().
+            
+        end.
+        
+     // Set to true for actions that is completely handled by the BE - no json and no key in url    
+    define public property IsEmpty as logical no-undo 
+        get. 
+        set(plEmpty as logical):
+            if plEmpty then
+            do:
+                if mIsCreateFalse then
+                     undo, throw new IllegalOperationError("Cannot set IsEmpty true when isCreate has been actively set to false"). 
+                IsCreate = true.
+            end.
+            IsEmpty = plEmpty.
+        end.
+        
     define public property ParameterList    as ParameterList     no-undo get. set.
     
     // det to true for primitive response
@@ -135,7 +172,16 @@ class Pmfo.Core.BusinessLogic.Action inherits Method implements IAction:
     method protected override logical GetNoContentResponseDefault ():
         return valid-object(SuccessRowState). 
     end method.
-   
+    
+    method protected void AssertIsCreate():
+        if IsCreate = false and IsEmpty = true then 
+            undo, throw new IllegalOperationError("Cannot set IsCreate false when IsEmpty is true").
+        // the Binding to Entity is used to allow key in URL and intended for existing records 
+        // if we ever need to limit the number of records to ONE for create we shoild use another property 
+        if IsCreate = true and MethodBindingEnum:Entity:Equals(Binding) then 
+            undo, throw new IllegalOperationError("Cannot set IsCreate true when Binding to a single Entity").
+    end method.
+    
     /*   
     method protected void AssertParameter(input pParam as IParameter) : 
         if pParam:IsArray then
@@ -315,15 +361,9 @@ class Pmfo.Core.BusinessLogic.Action inherits Method implements IAction:
         ParameterList:SetParameter(piPosition, DataTypeHelper:GetMask(pParameter:DataType), "input", pValues).
         ClientParameterList:SetParameter(piPosition, DataTypeHelper:GetMask(pParameter:DataType), "input", pValues).       
     end method.
-  
-    // caches the method and ClientParameterList  
-    method public logical HasClientMethod(pObject as Object, poUpdateDataRequest as IUpdateDataRequest, phDataset as handle).
-        define variable oClientParameterList as ParameterList no-undo.
-        GetClientMethod(pObject, poUpdateDataRequest, phDataset, output oClientParameterList).
-        return valid-object(oClientParameterList).
-    end method.
     
     method public Progress.Reflect.Method GetClientMethod(pObject as Object, poUpdateDataRequest as IUpdateDataRequest, phDataset as handle,output pClientParameterList as ParameterList):
+        define variable poClientParameterList as ParameterList no-undo.
         if not valid-object(ClientMethod) then
         do:
             if not valid-object(ClientParameterList) then
@@ -341,20 +381,35 @@ class Pmfo.Core.BusinessLogic.Action inherits Method implements IAction:
         
     end method.    
     
-     // allow control of row-state and field values after find for keys in url   
+    // allow control of row-state and field values after find using keys in url   
     method public void PostFindUnique(pRequestedBuffer as handle).
         define variable ifld as integer no-undo.
         define variable hFLs as handle no-undo. 
         define variable hFld as handle no-undo.
-        // the default is for consistency with action behavior and may not make sense
-        // override to change this behavior   
-        do iFld = 1 to pRequestedBuffer:num-fields:
-            hFld = pRequestedBuffer:buffer-field(iFLd).
-            if lookup(hFld:name,CompareFields) = 0 then
-               hFld:buffer-value() = hFld:default-value. 
+        
+        if MethodBindingEnum:Entity:Equals(Binding) = false then
+        do:
+            // the default is for consistency with action behavior and may not make sense
+            // override to change this behavior   
+            do iFld = 1 to pRequestedBuffer:num-fields:
+                hFld = pRequestedBuffer:buffer-field(iFLd).
+                if lookup(hFld:name,CompareFields) = 0 then
+                    hFld:buffer-value() = hFld:default-value. 
+            end.
+            pRequestedBuffer:mark-row-state (row-created).
         end.
-        pRequestedBuffer:mark-row-state (row-created).
+        
+    end method.
     
+    // see interface 
+    method public void RemoveClientMethod():
+        // ClientParamterList will have reference to the UpdateDataRequest.
+        // This is called after the method returned from GetClientMethod has been used to ensure GBC working as expected 
+        if valid-object(ClientParameterList) then
+            delete object ClientParameterList.
+        if valid-object(ClientMethod) then
+            delete object ClientMethod.
+        
     end method.
      
 end class.

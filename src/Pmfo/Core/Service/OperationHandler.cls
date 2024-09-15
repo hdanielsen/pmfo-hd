@@ -48,6 +48,7 @@ class Pmfo.Core.Service.OperationHandler abstract implements IOperationHandler,I
     define public property Logger as ILogWriter no-undo get. set.        
     define public property ResponseNodeName as character no-undo init "response" get.
     define public property WarningEntityName      as character init "@warnings" no-undo get. 
+    define public property MessageEntityName      as character init "@supervisorOverrides" no-undo get. 
     define public property QuestionEntityName     as character init "@questions" no-undo get. 
       
     define protected property OperationHandlerService as OperationHandlerService no-undo 

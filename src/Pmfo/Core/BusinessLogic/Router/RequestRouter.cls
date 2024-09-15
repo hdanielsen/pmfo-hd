@@ -39,6 +39,9 @@ using Pmfo.Util.ServiceInfo from propath.
 using Progress.Lang.Error from propath.
 using Progress.Lang.Object from propath.
 using System.Buffer from assembly.
+using Pmfo.Core.BusinessLogic.IDynamicBusinessEntity from propath.
+using Pmfo.Core.Error.UnsupportedOperationError from propath.
+ 
  
 class Pmfo.Core.BusinessLogic.Router.RequestRouter abstract  : 
 
@@ -89,7 +92,16 @@ class Pmfo.Core.BusinessLogic.Router.RequestRouter abstract  :
          /* the link is per defintion to the first dataset in the child */
          // we use the relation :name to find the entity - ans set the serialize-name from publci name below 
          oChild = cast(ServiceManager:CreateBusinessEntity(pRelation:Name),IBusinessEntity).
-      
+         if type-of(oChild,IDynamicBusinessEntity) then 
+         do: 
+             undo, throw new UnsupportedOperationError( 
+                subst("Resource '&1' in URL &2 is unsupported as a navigation link. It is only intended for the expand query option.",
+                            pRelation:PublicName,
+                            pClientRequest:ServiceURI
+                            )
+                   ).   
+                       
+         end.
          if type-of(oChild,IDynamicChild) then 
          do:
              if type-of(pRelation,IDynamicRelation) then 

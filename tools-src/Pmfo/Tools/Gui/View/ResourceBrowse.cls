@@ -44,12 +44,13 @@ class Pmfo.Tools.Gui.View.ResourceBrowse inherits Browse:
                 ResourceData.tempdb         column-label "Temp" view-as toggle-box 
                 resourceData.CodeTableKey   label "Code Key" // datatype and format  is defined in include with preprocessor 
                 resourceData.CodeTableName  format "x(40)" 
-                
-                if ResourceData.SDOname > "" then entry(num-entries(ResourceData.SDOname,StringConstant:BACKSLASH),ResourceData.SDOname,StringConstant:BACKSLASH) else "" @ ResourceData.SDOname format "x(25)" // width 50 
-                if ResourceData.dlpName > "" then entry(num-entries(ResourceData.dlpName,StringConstant:BACKSLASH),ResourceData.dlpName,StringConstant:BACKSLASH) else "" @ ResourceData.dlpName format "x(25)" // width 50 
+                resourceData.sdoDisplayname  format "x(27)"
+                resourceData.dlpDisplayname  format "x(27)"
+           //     if ResourceData.SDOname > "" then entry(num-entries(ResourceData.SDOname,StringConstant:BACKSLASH),ResourceData.SDOname,StringConstant:BACKSLASH) else "" @ ResourceData.SDOname format "x(25)" // width 50 
+             //   if ResourceData.dlpName > "" then entry(num-entries(ResourceData.dlpName,StringConstant:BACKSLASH),ResourceData.dlpName,StringConstant:BACKSLASH) else "" @ ResourceData.dlpName format "x(25)" // width 50 
                
         WITH NO-ROW-MARKERS SEPARATORS  
-        18 DOWN  
+        19 DOWN  
         title "Data Artifacts"  .
          
     define frame Browse-Frame
@@ -156,7 +157,7 @@ class Pmfo.Tools.Gui.View.ResourceBrowse inherits Browse:
                  end.
                  if rRowid <> ? then
                  do: 
-                     this-object:browse:Set-repositioned-row(integer(this-object:browse:down / 2),"CONDITIONAL").
+                     this-object:browse:set-repositioned-row(integer(this-object:browse:down / 2),"CONDITIONAL").
                      this-object:Query:reposition-to-rowid(rowid(resourceData)).
                      FireValueChanged().
                  end.
@@ -192,14 +193,17 @@ class Pmfo.Tools.Gui.View.ResourceBrowse inherits Browse:
             if Resourcedata.NotFromData then
             do:
                  setRowColor(Theme:InfoFg,Theme:InfoBg).
-            end. 
+            end.
             else if // resourceData.noCodes or
-                resourcedata.NotInUse or (resourcedata.tableName > "" and resourcedata.tableName <> CodeTableModel:CodeTableName and resourceData.definedinDb = false) then
-            do: 
+                resourcedata.NotInUse 
+                or (resourcedata.tableName > "" 
+                    and (valid-object(CodeTableModel) = false or resourcedata.tableName <> CodeTableModel:CodeTableName) 
+                    and resourceData.definedinDb = false
+                    ) then
+            do:
                 setRowColor(Theme:DisabledRowFg,Theme:DisabledRowBg).
                 lDisabled = true.
-            end.      
-            
+            end.
             if ServiceManager:CanFindPublicEntity(input ResourceData.resourceName) then
             do:
                 lExists = true.

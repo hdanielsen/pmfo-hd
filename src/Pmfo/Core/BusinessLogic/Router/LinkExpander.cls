@@ -32,13 +32,16 @@ using Pmfo.Util.TableUtil from propath.
 using Pmfo.Core.BusinessLogic.IGetDataRequest from propath.
 using Pmfo.Util.BufferUtil from propath.
 using OpenEdge.Core.Collections.IStringStringMap from propath.
-
+using Pmfo.Util.StringUtil from propath.
+ 
 class Pmfo.Core.BusinessLogic.Router.LinkExpander:
      
     define protected property ServiceManager as IServiceManager no-undo 
          get():
              return  cast(Application:ServiceManager,IServiceManager).
          end.  
+    
+    define protected property Expand as character no-undo get. set. 
     
     // as of current we throw bad request from assert as datasetRouter will throw them as-is 
     method public void AssertExpand(pcCollections as character extent,pcExpand as character):
@@ -50,6 +53,8 @@ class Pmfo.Core.BusinessLogic.Router.LinkExpander:
         define variable cOtherentry as character no-undo.
         define variable cThisentity as character no-undo.
         define variable cColectionList as character no-undo.
+        
+        Expand = pcExpand.
         
         cColectionList = Array:ToString(pcCollections).
         do i = 1 to num-entries(pcExpand):
@@ -148,19 +153,30 @@ class Pmfo.Core.BusinessLogic.Router.LinkExpander:
        //  SeparateClientRequests(pClientRequest,input-output pcExpand).
         
         AssertExpand(pClientRequest:Collections, pcExpand).
-            
-        // first expand the dataset if the requested table is the top in the dataset
-        // This will activate deactivated links also for cases that are not fullly resolved
-        // fully expanded entries will be removed from the returned expand 
-        
+       
+        // don't count action/function    
         if valid-object(pClientRequest:ServiceMethod) and pClientRequest:Collections[2] = pClientRequest:ServiceMethod:name then
             IMaxStaticentries = 2.
         else 
             IMaxStaticentries = 1.
         
-        
-        if extent(pClientRequest:Collections) = IMaxStaticentries and pClientRequest:Collections[1] = phDataset:serialize-name then
+        // first expand the dataset if the requested table is the top in the dataset
+        // This will activate deactivated links also for cases that are not fullly resolved
+        // fully expanded entries will be removed from the returned expand 
+        // 
+        if extent(pClientRequest:Collections) = IMaxStaticentries 
+        and pClientRequest:Collections[1] = phDataset:serialize-name
+        // not preapred to handle this in here- fully possible, but the only gaol here is to use the existing dataset
+        // so it would need to be done effciently and links
+        // TODO? get rid of this entirely since it adds complication also for select 
+        //       or rewrite to a better way to check the relation versus the expand entries
+        //       Everything works if this is not here! the differenc is that this may use the exiting statc dataset
+        //       This will have many more relations and buffers so may have cost elsewhere      
+        and HasXrefRelation(pLinks) = false
+        then
+        do:
             cExpand = ExpandDatasetLinks(pcRequestedEntity,phDataset,pClientRequest, pcExpand).
+        end.
         else
             cExpand = pcExpand. 
          
@@ -207,7 +223,15 @@ class Pmfo.Core.BusinessLogic.Router.LinkExpander:
         end.
         else 
             hDataset = phDataset.
-     
+        
+/*        define variable j as integer no-undo.                                     */
+/*        define variable cc as character no-undo.                                  */
+/*        do j = 1 to hdataset:num-buffers:                                         */
+/*           cc = cc + subst("buffer &1",hdataset:get-buffer-handle(j):name) + "~n".*/
+/*                                                                                  */
+/*        end.                                                                      */
+/*        message cc                                                                */
+/*        view-as alert-box.                                                        */
         return hDataset.  
         catch e3 as IllegalOperationError :
             undo, throw e3.     
@@ -280,8 +304,13 @@ class Pmfo.Core.BusinessLogic.Router.LinkExpander:
         // activate the relation if found 
         if lFound then
         do:
-             phRelation:active = true.
+            message "activarted link" phRelation:parent-buffer:name phRelation:parent-buffer:serialize-name skip
+                                      phRelation:child-buffer:name                                    phRelation:child-buffer:name
+   
+            view-as alert-box.
+            phRelation:active = true.
             ProcessSelect(pcRequestedentity, phRelation:child-buffer, poCLientRequest). 
+            
         end.
         
         // if fully resolved remove the entry             
@@ -388,7 +417,7 @@ class Pmfo.Core.BusinessLogic.Router.LinkExpander:
          end.
      end method.  
      
-     method protected character GetQualNameAndProcessSelect(pcRequestedentity as char, phBuffer as handle,poCLientRequest as IClientGetRequest, output pcExpandQualname as character  ): 
+     method protected character GetQualName(pcRequestedentity as char, phBuffer as handle, output pcExpandQualname as character  ): 
          define variable cQualname       as character no-undo.
          define variable iQual           as integer no-undo.
          
@@ -408,15 +437,32 @@ class Pmfo.Core.BusinessLogic.Router.LinkExpander:
                  end.     
                   
              end.
-             HideFields(phBuffer, poCLientRequest:GetExpandSelect(pcExpandQualname)).
          end.
          return cQualname. 
      end method.    
      
      method protected void ProcessSelect(pcRequestedentity as char, phBuffer as handle,poCLientRequest as IClientGetRequest ): 
          define variable cDummy as character no-undo.
-         GetQualNameAndProcessSelect(pcRequestedentity, phBuffer, poCLientRequest, output cDummy). 
+         ProcessSelect(pcRequestedentity, phBuffer, false, poCLientRequest). 
      end method.    
+     
+     method protected void ProcessSelect(pcRequestedEntity as char, phBuffer as handle, plXrefTarget as logical, poCLientRequest as IClientGetRequest ): 
+         define variable cQualname       as character no-undo.
+         define variable iQual           as integer no-undo.
+         define variable cExpandQualName as character no-undo.
+         cQualname = GetQualName(pcRequestedEntity,phBuffer,output cExpandQualName).
+         // expand is relative to pcRequestedentity. This may not be the top table in the dataset
+         // so to find the relative name to pass to GetExpandSelect remove all qualifiers before including pcRequestedentity
+         if num-entries(cQualName,"/") > 1 then
+         do:
+             // if xreftarget then the expand slect is defined on the parent 
+             if plXrefTarget then 
+                 cExpandQualname = StringUtil:RemoveEntryFromList(num-entries(cExpandQualname,"/"),cExpandQualname,"/"). 
+                                   
+             HideFields(phBuffer, poCLientRequest:GetExpandSelect(cExpandQualname)).
+         end.    
+     end method.    
+     
      
      method protected void ProcessLinks(pcRequestedentity as character, phDataset as handle, phBuffer as handle,pExpandLinks as ICollection, pBEDataset as handle, pBeLinks as ICollection, pAllow as logical, poCLientRequest as IClientGetRequest):
          define variable oIterator      as IIterator no-undo.
@@ -436,18 +482,43 @@ class Pmfo.Core.BusinessLogic.Router.LinkExpander:
          define variable cExpandQualname  as character no-undo.
          define variable cUniquename      as character no-undo.
          define variable iSuffix         as integer no-undo.
+         define variable iExpand as integer no-undo.
+         define variable lcorrectparent as logical no-undo.
+         define variable cChildpath as character no-undo.
+         define variable lDynEntity as logical no-undo.           
        //  define variable iQual           as integer no-undo.
          
          oIterator = pExpandLinks:Iterator().
-         cQualName = GetQualNameAndProcessSelect(pcRequestedentity,phBuffer,poCLientRequest, output cExpandQualName).          
+         cQualName = GetQualName(pcRequestedentity,phBuffer, output cExpandQualName). 
+         linkloop:         
          do while oIterator:HasNext():
-             
              oRelDef = cast(oIterator:Next(),IRelationDefinition).
              if oRelDef:ParentName = phBuffer:serialize-name then
              do:
-               
+                 lCorrectparent = true. // only used for measurements as of current
+         
+                 // this isassumed to be correct for every case, but currently implemented for measurements
+                 // needs serious testing befor emaking general 
+                 if oReldef:PublicName = "measurements" then
+                 do:
+                     cChildpath = cQualname.
+                     entry(1,cChildpath,"/") = "".
+                     cChildPAth = left-trim(cChildPAth,"/").
+                     cCHildpath = left-trim(subst("&1/&2",cChildPAth,oRelDef:PublicName),"/").
+                     lCorrectparent = false.
+                     do iExpand = 1 to num-entries(Expand):
+                         if entry(iExpand,Expand) begins cChildpath then
+                         do:
+                            lcorrectparent = true.
+                            leave.
+                         end.                              
+                     end.
+                     if not lcorrectparent then 
+                         next linkloop.
+                 
+                 end.    
                  cRelationParent = oRelDef:ParentName.
-                  
+                 
                  if phBuffer:table-handle:serialize-name <> phBuffer:serialize-name then
                  do:  
                      // this check is likely redundant as the check below also will catch this  
@@ -466,6 +537,10 @@ class Pmfo.Core.BusinessLogic.Router.LinkExpander:
                  if valid-object(pBeLinks) then
                  do:
                      oRelation = GetRelation(pBeLinks, cRelationParent, oRelDef:PublicName).
+/*                     message "got relation from belinks buffer" phBuffer:name*/
+/*                     "relation"  oRelation                                   */
+/*                                                                             */
+/*                     view-as alert-box.                                      */
                      if valid-object(oRelation) then 
                      do:
                        // unecessary  - works with current datasource? fillmode?  
@@ -484,6 +559,7 @@ class Pmfo.Core.BusinessLogic.Router.LinkExpander:
 /*                                                                                                                                                                                  */
 /*                         end.                                                                                                                                                     */
                          cServiceEntity = oRelation:name.
+                         lDynEntity = oRelation:IsDynamic.
                          oRelDef:Cardinality = oRelation:Cardinality.
                          cPairsList = oRelation:PairsList().
                          lResolved = true.
@@ -494,7 +570,8 @@ class Pmfo.Core.BusinessLogic.Router.LinkExpander:
                          //  add a relation for the xref so that the table in the other end is added to the dataset
                          if oRelation:XRef then
                          do:
-                            pExpandLinks:Add(new RelationDefinition(cPublicName,cPublicName)).
+                             oReldef:Xref = true. 
+                             pExpandLinks:Add(new RelationDefinition(cPublicName,cPublicName)).
                          end.
                      end.
                  end.
@@ -513,13 +590,18 @@ class Pmfo.Core.BusinessLogic.Router.LinkExpander:
                  end. 
                  if lResolved then
                  do:
-                     
                      do on error undo, throw:
-                         oBe = cast(ServiceManager:CreateBusinessEntity(cServiceEntity),IBusinessEntity).
+                         if lDynEntity then 
+                         do:
+                             oBe = ServiceManager:CreateDynamicBusinessEntity(phBuffer, oRelation).
+                         end.
+                         else
+                             oBe = ServiceManager:CreateBusinessEntity(cServiceEntity).
                          catch e as Progress.Lang.Error :
-                            undo, throw new IllegalOperationError(subst("Child entity not found for relation from '&1' to '&2'",oRelDef:ParentName, oRelDef:PublicName),e).
+                             undo, throw new IllegalOperationError(subst("Child entity not found for relation from '&1' to '&2'",oRelDef:ParentName, oRelDef:PublicName),e).
                          end catch.
                      end.
+                      
                      // The buffer may already be in the dataset of the caller 
                      // in which case it was copied in copychildren
                      // skip for the special Xref case where parent and child is the same 
@@ -528,6 +610,7 @@ class Pmfo.Core.BusinessLogic.Router.LinkExpander:
                      do:  
                          hBuffer = DatasetUtil:GetBufferByPathName(phDataset, cQualName + "/" + cPublicName). 
                      end. 
+                   
                      // TODO if valid check that it mathches the relation - and that relation is acive
                      // NOTE a copyChildren depends on the relation being acitvated and  
                      // the DatasetRouter will activate the link if it has be deactivated , but 
@@ -537,22 +620,47 @@ class Pmfo.Core.BusinessLogic.Router.LinkExpander:
                      do:
                          if not valid-handle(hBeBuffer) then
                              HBeBuffer = oBe:LinkDataset:get-buffer-handle(1).
-                         
+                   
                          cUniquename = hBeBuffer:table-handle:name.
                          // need unique name for DataAccess - (really only when the table has children - since the name is used in the join for children) 
                          // magic : (static name in DS definition will still work when TT is passed with BIND or BY-REFERENCE)
                          do while valid-handle(DatasetUtil:GetBufferByTableName(phDataset,cUniquename)):
-                             iSuffix = iSuffix + 1.  
-                             cUniquename = subst("&1-&2",hBeBuffer:table-handle:name,iSuffix).
+                             iSuffix = iSuffix + 1.
+                             if length(cUniquename) > 32 and iSuffix < 10 then
+                             do:
+                                 cUniqueName = substr(hBeBuffer:table-handle:name,1,31) + string(iSuffix).
+                             end. 
+                             if length(cUniquename) > 30  then
+                             do:
+                                 cUniqueName = substr(hBeBuffer:table-handle:name,1,30) + string(iSuffix).
+                             end. 
+                             else 
+                                 cUniquename = subst("&1-&2",
+                                                     hBeBuffer:table-handle:name,
+                                                    iSuffix
+                                                   ).
                          end.  
+                         
                          hNewTable = TableUtil:CreateTableLike(hBeBuffer,cUniquename).
-                         create buffer hbuffer for table hNewTable buffer-name hNewTable:name. 
-                         
-                         hbuffer:serialize-name = cPublicName.
-                         
+                        
+                         // DO NOT CREATE BUFFER !! use default-buffer-handle
+                         // using defualt befuffer ensures that we can pass input table to programs
+                         // and have acces to the data set and the relations 
+                        
+                         // Exception - for alias we need to use table since we cannot 
+                         // have different serialize-name for default-buffer   
+                         if cPublicName <> hnewTable:serialize-name then
+                         do:
+                             create buffer hbuffer for table hNewTable buffer-name hNewTable:name.
+                             hbuffer:serialize-name = cPublicName.
+                         end.
+                         else 
+                             hBuffer = hNewTable:default-buffer-handle. 
+                              
                          phDataset:add-buffer(hbuffer).
                          // something is wrong when using all parameters to set foreign-key-hidden - possibly not-active is oppsiote  
                          hRelation = phDataset:add-relation(phBuffer,hBuffer,cPairsList,false,true).
+                         
                          // don't hide foreign key for XREF - we need it since the parent will be removedt
                          // also don't hide for other relations han one to many as the caller may want 
                          // to PUT or POST to this and need the key as it will not be a child in that case 
@@ -567,6 +675,15 @@ class Pmfo.Core.BusinessLogic.Router.LinkExpander:
                      do:
                          pExpandLinks:Remove(oRelDef).
                      end.
+                     
+                     // if this is an xref realtion then we wait with select until next round where oRelDef:ParentName = oRelDef:PublicName
+                     // since the slect is for the xref target
+                     if valid-object(oRelation) = false or oRelation:XRef = false then 
+                          ProcessSelect(pcRequestedentity,
+                                        hBuffer,
+                                        oRelDef:ParentName = oRelDef:PublicName,
+                                        poCLientRequest).
+                                        
                      ProcessLinks(pcRequestedentity,phDataset,hBuffer,pExpandLinks,oBe:LinkDataset,if oBe:HasLink then oBe:Links else ?,?,poCLientRequest).
                  end.
                  else  
@@ -611,8 +728,22 @@ class Pmfo.Core.BusinessLogic.Router.LinkExpander:
              end.    
          end.
      end.   
-    
-    
+     
+     method private logical HasXrefRelation(pLinks as ICollection):
+        define variable oIterator as IIterator no-undo.  
+        define variable oRelation       as IRelation no-undo.
+       
+        if valid-object(pLinks) then
+        do:
+            oIterator = pLinks:Iterator().
+            do while oIterator:HasNext():
+                oRelation = cast(oIterator:Next(),IRelation).
+                if oRelation:XRef then 
+                    return true.
+            end.       
+        end.
+     end method.
+     
      method protected IRelation GetRelation(pLinks as ICollection, pcParent as character, pcPubName as character):
         define variable oIterator as IIterator no-undo.  
         define variable oRelation       as IRelation no-undo.
@@ -631,7 +762,7 @@ class Pmfo.Core.BusinessLogic.Router.LinkExpander:
         return ?.
     end method.  
     
-     method protected handle GetDatasetRelation(phDataset as handle, pcParent as character, pcPubName as character):
+    method protected handle GetDatasetRelation(phDataset as handle, pcParent as character, pcPubName as character):
         define variable i as integer no-undo.
         define variable hRelation as handle no-undo.
         do i = 1 to phDataset:num-relations :

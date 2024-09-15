@@ -48,7 +48,7 @@ class Pmfo.Core.DataLayer.DataSourceInnerJoinMap implements IDataSourceMap:
          get().
              if not valid-object(QueryRenameUtil) then
              do:
-                 QueryRenameUtil = new QueryRenameTableQualifiers(DbFieldRenameMap, true).  // true - list has rename entry first  
+                 QueryRenameUtil = new QueryRenameTableQualifiers(true).  // true - list has rename entry first  
              end.
              return QueryRenameUtil.    
          end.    
@@ -200,9 +200,12 @@ class Pmfo.Core.DataLayer.DataSourceInnerJoinMap implements IDataSourceMap:
                     do:
                        entry(1,cColumn,".") = cRename.
                        if lookup(cRename,DbFieldRenameMap) = 0 then
+                       do:
                           DbFieldRenameMap = DbFieldRenameMap 
                                  + (if DbFieldRenameMap = "" then "" else ",")
-                                 + cRename + "," + cReturnedBufferName.  
+                                 + cRename + "," + cReturnedBufferName.
+                          QueryRenameUtil:TableRenames = DbFieldRenameMap.
+                       end.               
                     end.    
                 end.     
             end.

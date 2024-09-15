@@ -27,7 +27,6 @@ class Pmfo.Core.BusinessLogic.Builder.GetDataRequestBuilder  :
     define public property Request as IGetDataRequest no-undo get. protected set.
     define variable TableRequests as IGetDataTableRequest extent no-undo.
     define protected variable Tables as character no-undo.
-    define private variable nothing as logical no-undo.
         /*------------------------------------------------------------------------------
      Purpose:
      Notes:

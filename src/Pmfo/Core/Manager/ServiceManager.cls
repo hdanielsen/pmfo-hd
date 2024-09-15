@@ -89,17 +89,28 @@ using Progress.Lang.Object from propath.
 using Pmfo.Core.BusinessLogic.Delegate.IFetchFunctionDelegate from propath.
 using Pmfo.Core.BusinessLogic.Delegate.FetchFunctionDelegate from propath.
 using Pmfo.Util.Array from propath.
+using Pmfo.Core.BusinessLogic.Delegate.ISubmitDelegate from propath.
+using Pmfo.Core.BusinessLogic.Delegate.SubmitDelegate from propath.
+using Pmfo.Core.BusinessLogic.Delegate.IGetInternalDataDelegate from propath.
+using Pmfo.Core.BusinessLogic.Delegate.GetInternalDataDelegate from propath.
+using Pmfo.Core.BusinessLogic.Delegate.IValidateDelegate from propath.
+using Pmfo.Core.BusinessLogic.Delegate.ValidateDelegate from propath.
+using Pmfo.Core.BusinessLogic.IDynamicBusinessEntity from propath.
+using Pmfo.Core.Error.IllegalOperationError from propath.
+using Pmfo.Core.BusinessLogic.IRelation from propath.
 
 // There are tow different canFind implementaions. 
 // One that uses can-find and one that uses find sonce can-find is faster we want 
 // to keep both implementations and use this preprocesor where clause to ensure 
 // the logic is the same
-  
+ 
+ /* Bug? version afer 12.2 broke this 
 &scop canfindwhere ttEntity~
  where ttEntity.Resource = pcname~
  and (not valid-object(pClass) or ttEntity.TypeName = pClass:TypeName)~
  and (plOnlyPublic = false or ttEntity.Public = plOnlyPublic)~
- and (plOnlyPublic = false or lookup(ServerType:ToString(),ttEntity.ServerTypes) > 0)
+ and (plOnlyPublic = false or lookup('general',ttEntity.ServerTypes) > 0)
+         */
                                   
 class Pmfo.Core.Manager.ServiceManager inherits Manager implements IServiceManager : 
     
@@ -201,7 +212,59 @@ class Pmfo.Core.Manager.ServiceManager inherits Manager implements IServiceManag
            return  FetchDelegate.    
        end.
        set.
+    
+    // Singleton - keep alive forever - we do mnot use staitc since we may need to override in application ServiceNanager  
+    // (Add create method if necessary )   
+    define protected property SubmitDelegate as ISubmitDelegate 
+       get().
+           if not valid-object(SubmitDelegate) then 
+           do:
+               SubmitDelegate = new SubmitDelegate().
+               // ensure that initialize is called if defined 
+               if type-of(SubmitDelegate,ISupportInitialize) then
+                  cast(SubmitDelegate,ISupportInitialize):Initialize().
+               else if type-of(SubmitDelegate,IService) then
+                  cast(SubmitDelegate,IService):Initialize().
+           end.
+           return  SubmitDelegate.    
+       end.
+       set.
+    
+    // Singleton - keep alive forever - we do not use static since we may need to override in application ServiceNanager  
+    // (Add create method if necessary )   
+    define protected property ValidateDelegate as IValidateDelegate 
+       get(). 
+           if not valid-object(ValidateDelegate) then 
+           do:
+              // allow override by subclass
+              ValidateDelegate = CreateValidateDelegate().
+              if type-of(ValidateDelegate,ISupportInitialize) then
+                  cast(ValidateDelegate,ISupportInitialize):Initialize().
+              else if type-of(ValidateDelegate,IService) then
+                 cast(ValidateDelegate,IService):Initialize().
+           end.
+           return ValidateDelegate.     
+       end.
+       set.
+    
+     // Singleton - keep alive forever - we do mnot use staitc since we may need to override in application ServiceNanager  
+    // (Add create method if necessary )   
+    define protected property GetInternalDataDelegate as IGetInternalDataDelegate 
+       get().
+           if not valid-object(GetInternalDataDelegate) then 
+           do:
+               GetInternalDataDelegate = new GetInternalDataDelegate().
+               // ensure that initialize is called if defined 
+               if type-of(GetInternalDataDelegate,ISupportInitialize) then
+                  cast(GetInternalDataDelegate,ISupportInitialize):Initialize().
+               else if type-of(GetInternalDataDelegate,IService) then
+                  cast(GetInternalDataDelegate,IService):Initialize().
+           end.
+           return  GetInternalDataDelegate.    
+       end.
+       set.
        
+           
      // Singleton - keep alive forever - we do mnot use staitc since we may need to override in application ServiceNanager  
     // (Add create method if necessary )   
     define protected property FetchFunctionDelegate as IFetchFunctionDelegate 
@@ -256,6 +319,7 @@ class Pmfo.Core.Manager.ServiceManager inherits Manager implements IServiceManag
     
     // not in interface - used by tools only
     method public void RefreshResources():
+       
         if CheckForNewResources then
         do:
             if not valid-object(ResourceBE) then
@@ -277,7 +341,30 @@ class Pmfo.Core.Manager.ServiceManager inherits Manager implements IServiceManag
     
     /** create entity methods */
     method public IBusinessEntity CreateBusinessEntity( input pcName as character ):
-        return cast(CreateEntity(pcName,false,?,get-class(IBusinessEntity)),IBusinessEntity).    
+        return cast(CreateEntity(pcName,false,false,?,get-class(IBusinessEntity)),IBusinessEntity).    
+    end method.
+    
+    method public IBusinessEntity CreateDynamicBusinessEntity (phContextHandle as handle,poRelation as IRelation):   
+        define variable oEntity as IBusinessEntity no-undo.
+         
+        oEntity = cast(CreateEntity(poRelation:Name,false,false,?,get-class(IBusinessEntity)),IBusinessEntity).    
+        if type-of(oEntity,IDynamicBusinessEntity) then
+        do:
+            cast(oEntity,IDynamicBusinessEntity):CreateFromParentBuffer(phContextHandle,poRelation). 
+            
+            if type-of(oEntity,ISupportInitialize) then 
+                cast(oEntity,ISupportInitialize):Initialize().
+            else if type-of(oEntity,IService) then
+                cast(oEntity,ISupportInitialize):Initialize().
+        end.     
+        else 
+            undo, throw new IllegalOperationError(subst("CreateDynamicBusinessEntity called for entity '&1' that does not implement IDynamicBusinessEntity interface.",poRelation:PublicName)). 
+    
+        return oEntity.
+    end method.  
+    
+    method public IBusinessEntity CreateBusinessEntityForTableRead (pcName as character):
+        return cast(CreateEntity(pcName,false,true,?,get-class(IBusinessEntity)),IBusinessEntity).    
     end method.
     
     // start entity if get or receive hook - clientonly isw 
@@ -304,8 +391,7 @@ class Pmfo.Core.Manager.ServiceManager inherits Manager implements IServiceManag
             return ?.
         end.
         
-        
-        oEntity = cast(CreateEntity(pcName,false,EntityRequestTypeEnum:Read,get-class(IBusinessEntity)),IBusinessEntity).
+        oEntity = cast(CreateEntity(pcName,false,false,EntityRequestTypeEnum:Read,get-class(IBusinessEntity)),IBusinessEntity).
         find ttEntity where ttEntity.Resource = pcname no-error.
         if avail ttEntity then
              assign
@@ -332,7 +418,7 @@ class Pmfo.Core.Manager.ServiceManager inherits Manager implements IServiceManag
     method public IBusinessEntity CreateBusinessEntityForRequest( input pcName as character,pEntityRequestType as EntityRequestTypeEnum, output plHasRequestedMethod as logical, output plHasReceive as logical):
         define variable oEntity as IBusinessEntity no-undo.
         
-        oEntity = cast(CreateEntity(pcName,false,pEntityRequestType,get-class(IBusinessEntity)),IBusinessEntity).
+        oEntity = cast(CreateEntity(pcName,false,false,pEntityRequestType,get-class(IBusinessEntity)),IBusinessEntity).
         if valid-object(oEntity) then 
         do:
             // it should be avail, but if not then assume no subscribtion 
@@ -354,15 +440,35 @@ class Pmfo.Core.Manager.ServiceManager inherits Manager implements IServiceManag
         return oEntity.       
     end method.
     
+    method public logical BusinessEntityHasRequestType  (pcName as char, pEntityRequestType as EntityRequestTypeEnum).
+        find ttEntity where ttEntity.Resource = pcname
+                       and ttEntity.Typename = get-class(IBusinessEntity):TypeName no-error. 
+          
+        if avail ttEntity then
+        do: 
+           case pEntityRequestType:
+               when EntityRequestTypeEnum:Update then
+                   return ttEntity.SubscribeUpdate.
+               when EntityRequestTypeEnum:Read then
+                   return ttEntity.SubscribeGet.
+               when EntityRequestTypeEnum:Action then
+                   return ttEntity.SubscribeAction.
+           end.
+        end.
+        else 
+            undo, throw new ApplicationError(subst("Business Entity '&1' does not exist",pcname)). 
+    end method.
+   
+    
     method public IServiceEntity CreateServiceEntity( input pcName as character ):
-        return cast(CreateEntity(pcName,false,?,get-class(IServiceEntity)),IServiceEntity).    
+        return cast(CreateEntity(pcName,false,false,?,get-class(IServiceEntity)),IServiceEntity).    
     end method.
     
     method public IEntity CreateEntity( input pcName as character ):
-        return CreateEntity(pcName,false,?,?).    
+        return CreateEntity(pcName,false,false,?,?).    
     end method.
     
-    method protected IEntity CreateEntity( input pcName as character, plOnlyPublic as logical, pEntityRequestType as EntityRequestTypeEnum, pClass as Progress.Lang.Class ):
+    method protected IEntity CreateEntity( input pcName as character, plOnlyPublic as logical, plSkipInitForTableRead as logical, pEntityRequestType as EntityRequestTypeEnum, pClass as Progress.Lang.Class ):
         define variable oEntity as IEntity no-undo.
         // cannot manage this with Temp-tables since it is used to populate them 
         // we use the method to allow overrides in subclass 
@@ -435,7 +541,7 @@ class Pmfo.Core.Manager.ServiceManager inherits Manager implements IServiceManag
                             and ttEntity.Typename = pClass:TypeName no-error.
         else                     
             find ttEntity where ttEntity.Resource = pcname no-error.
-        
+       
         // if only update return null if no client behavior needed for update (we need to start it also if subscribereceive )
         if EntityRequestTypeEnum:Update:Equals(pEntityRequestType) and (avail ttEntity = false or (ttEntity.SubscribeUpdate = false and ttEntity.SubscribeReceive = false)) then 
             return ?. // don't throw error for this
@@ -464,15 +570,18 @@ class Pmfo.Core.Manager.ServiceManager inherits Manager implements IServiceManag
         if plOnlyPublic and ttEntity.public = false then
             undo, throw new NotFoundError(subst('Public Entity "&1"',pcName)).  
              
+       
         oEntity = dynamic-new ttEntity.ClassName ().
-        
-        
-        if type-of(oEntity,ISupportInitialize) then 
-            cast(oEntity,ISupportInitialize):Initialize().
-        else if type-of(oEntity,IService) then
-            cast(oEntity,ISupportInitialize):Initialize().
-            
-        return oEntity.    
+        // dynamic must be called from CreateDynamicBusinessEntity and will call initalize after create of table
+        if type-of(oEntity,IDynamicBusinessEntity) = false
+        and (plSkipInitForTableRead = false or ttEntity.MustInitializeForTableRead = true) then
+        do:
+            if type-of(oEntity,ISupportInitialize) then 
+                cast(oEntity,ISupportInitialize):Initialize().
+            else if type-of(oEntity,IService) then
+                cast(oEntity,ISupportInitialize):Initialize().
+        end.
+        return oEntity.     
     end method.
     
     /** can find entity methods */
@@ -550,21 +659,26 @@ class Pmfo.Core.Manager.ServiceManager inherits Manager implements IServiceManag
     
     // main logic for can-find that does not return namre and thus can use can-find 
     method protected logical CanFindEntity( input pcName as character, plOnlyPublic as logical, pClass as Progress.Lang.Class ):
-        RefreshResources().   
-        return can-find ({&canfindwhere}).                    
+        RefreshResources().  
+        return CanFindEntity(input-output pcName, plOnlyPublic, pClass).
     end method.
     
     // main logic for can-find that returns name for casing purposes 
     method protected logical CanFindEntity( input-output pcName as character, plOnlyPublic as logical, pClass as Progress.Lang.Class ):
         RefreshResources().
-        find {&canfindwhere} no-error.
+        // this was resolved by a can-find statement in 12.2 - does not work in newer versions -  
+        find ttEntity where ttEntity.resource = pcName no-error.
         if avail ttEntity then 
         do:
-            pcName = ttEntity.Resource.
-            return true.
+            if  (not valid-object(pClass) or ttEntity.TypeName = pClass:TypeName)  
+            and (plOnlyPublic = false or ttEntity.Public = plOnlyPublic)  
+            and (plOnlyPublic = false or lookup(ServerType:ToString(),ttEntity.ServerTypes) > 0) then
+            do:
+                pcName = ttentity.resource.
+                return true.
+            end.    
         end.             
-        else 
-            return false.                
+        return false.                
     end method.
     
     method public logical CanFindDataSource( input pcName as character ):
@@ -827,10 +941,23 @@ class Pmfo.Core.Manager.ServiceManager inherits Manager implements IServiceManag
             do:
                 return FetchDelegate. // singleton - initialized in getter
             end.
+            when get-class(ISubmitDelegate) then
+            do:
+                return SubmitDelegate. // singleton - initialized in getter
+            end.
             when get-class(IFetchFunctionDelegate) then
             do:
                 return FetchFunctionDelegate. // singleton - initialized in getter
             end.
+            when get-class(IGetInternalDataDelegate) then
+            do:
+                return GetInternalDataDelegate. // singleton - initialized in getter
+            end.
+            when get-class(IValidateDelegate) then
+            do:
+                return ValidateDelegate. // singleton - initialized in getter
+            end.
+            
             
             otherwise        
                 undo, throw new NotImplementedError(subst("GetService (Class &1)",poService:TypeName)).
@@ -980,6 +1107,10 @@ class Pmfo.Core.Manager.ServiceManager inherits Manager implements IServiceManag
         end.
     end method.
     
+    // allow override by sub class
+    method protected IValidateDelegate CreateValidateDelegate():
+        return new ValidateDelegate().    
+    end method.    
     
     // allowo override
     method protected ICatalog CreateCatalog(pcName as character):
@@ -998,17 +1129,17 @@ class Pmfo.Core.Manager.ServiceManager inherits Manager implements IServiceManag
             when get-class(IEntity) then
             do:
                 // true only if pubiic
-                return CreateEntity(pcName,true,?,?).
+                return CreateEntity(pcName,true,false,?,?).
             end.
             when get-class(IBusinessEntity) then
             do:
                 // true only if pubiic
-                return CreateEntity(pcName,true,?,get-class(IBusinessEntity)).
+                return CreateEntity(pcName,true,false,?,get-class(IBusinessEntity)).
             end.
             when get-class(IServiceEntity) then
             do:
                 // true only if pubiic
-                return CreateEntity(pcName,true,?,get-class(IServiceEntity)).
+                return CreateEntity(pcName,true,false,?,get-class(IServiceEntity)).
             end.
             when get-class(IDataAccess) then
             do:
@@ -1112,7 +1243,7 @@ class Pmfo.Core.Manager.ServiceManager inherits Manager implements IServiceManag
     method protected void LoadResources():
         define variable oGetDataRequest as IGetDataRequest no-undo.
         // use CreateBusinessEntity method to allow subclass override  
-        if valid-object(ResourceBE) then 
+        if valid-object(ResourceBE) then
             delete object ResourceBE. 
             
         ResourceBE = cast(CreateBusinessEntity("resources"),ResourceBE).

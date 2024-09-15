@@ -9,7 +9,6 @@
     Notes       . 
   ----------------------------------------------------------------------*/
  
- 
 using Ccs.Common.IService from propath.
 using OpenEdge.Core.Collections.IMap from propath.
 using OpenEdge.Core.Collections.ISet from propath.
@@ -33,8 +32,9 @@ using Pmfo.Core.Common.ServerTypeEnum from propath.
 using Pmfo.Core.Service.IClientRequest from propath.
 using Progress.Lang.Object from propath.
 using Pmfo.Core.Common.INamedArrayHolder from propath.
+using Pmfo.Core.BusinessLogic.Delegate.IBusinessEntityDelegator from propath.
  
-interface Pmfo.Core.BusinessLogic.IBusinessEntity inherits IEntity, IService.  
+interface Pmfo.Core.BusinessLogic.IBusinessEntity inherits IEntity, IService, IBusinessEntityDelegator.  
     define public event DataReceived signature void (pParent as Pmfo.Core.BusinessLogic.IBusinessEntity, pReceiveDataArgs as IReceiveDataEventArgs, phDataset as handle).
     
     define public property HasLink            as logical          no-undo get.
@@ -62,6 +62,7 @@ interface Pmfo.Core.BusinessLogic.IBusinessEntity inherits IEntity, IService.
     define public property HasSuccessMessages    as logical             no-undo get.
     
     define public property Datasets       as handle extent no-undo get. 
+  
     // allow control of which dataset to use for linking - useful if main dataset is recursive, perhoas  also ifdataset has lots tables for update  
     define public property LinkDataset    as handle no-undo get.    
     
@@ -108,7 +109,10 @@ interface Pmfo.Core.BusinessLogic.IBusinessEntity inherits IEntity, IService.
     method public logical GetData( input pTableRequest as Pmfo.Core.BusinessLogic.IGetDataTableRequest,output table-handle phTable).
     // for ABL request for just the table
     method public logical GetData( input pQueryEntry as IQueryEntry,output table-handle phTable).
-    
+    method public logical GetData(output table-handle phTable).
+    // for ABL request for the Be with some data 
+    method public logical GetData( input pQueryEntry as IQueryEntry).   
+
     method public int64 Count().
     method public int64 Count(input pTableRequest as Pmfo.Core.BusinessLogic.IGetDataTableRequest).
     
@@ -116,6 +120,7 @@ interface Pmfo.Core.BusinessLogic.IBusinessEntity inherits IEntity, IService.
     method public IRelation GetLink(pcParent as character, pcname as character):
     
     method public void BeforeUpdateData(pUpdateDataArgs as IUpdateDataEventArgs, phDataset as handle).
+    method public void ValidateTable(pUpdateDataArgs as IUpdateDataEventArgs, phBuffer as handle).
     method public void PrepareGetTableRequest (poRequest as IGetDataTableRequest, phBuffer as handle):
     
     method public Object updateData (input-output dataset-handle phDataset,poUpdateDataRequest as IUpdateDataRequest).     
@@ -135,7 +140,9 @@ interface Pmfo.Core.BusinessLogic.IBusinessEntity inherits IEntity, IService.
     method public character GetPublicTextField().
     
     method public character ConvertSingleKeyToExpression (phbuffer as handle, pcExpression as character) .
-     
+    method public logical CompareAndRefreshCurrentSelf(phBuffer as handle, pcRefreshFields as char, pcTooLateFields as char, output pcRefreshInfo as character).
+    method public void AssertCurrentSelf(phBuffer as handle, pcFields as char).
+    
     method public void Clear().
     method public void SubscribeDataReceived(pEntity as Pmfo.Core.BusinessLogic.IBusinessEntity, pcSerializeName as character).
     method public void UnsubscribeDataReceived().

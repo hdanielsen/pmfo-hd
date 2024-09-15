@@ -37,6 +37,8 @@ interface Pmfo.Core.DataLayer.IFieldProxy:
     method logical Save().                    
     method logical Prepare(phDataBuffer as handle, phDatabaseBuffer as handle).
     
+   
+ // not in use   method void ResetSourceName(input pcName as character).
     method IQueryEntry ColumnExpression(input pPredicate as IQueryPredicate).
     method IQuerySortEntry ColumnSort(input pSort as IQuerySortEntry ).
     

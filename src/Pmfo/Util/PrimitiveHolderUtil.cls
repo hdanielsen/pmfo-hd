@@ -472,6 +472,52 @@ class Pmfo.Util.PrimitiveHolderUtil:
         return new Pmfo.Core.Common.IntegerArrayHolder(pValues).
     end method. 
     
+    method public static void AddNameAndValueToJson(
+                                        pName as character ,
+                                        pHolder   as IPrimitiveHolder,
+                                        pJson     as JsonObject):
+          
+          
+          pJson:Add("name",pName).
+          AddToJson("value",pHolder,pJson).
+    end method.
+    
+    method public static void AddToJsonArray(
+                                        pHolder    as IPrimitiveHolder,
+                                        pJsonArray as JsonArray):
+         case true   :
+            when pHolder:GetClass():isA(get-class(ICharacterHolder)) then 
+                pJsonArray:Add(cast(pholder,ICharacterHolder):value).
+
+            when pHolder:GetClass():isA(get-class(IDateHolder)) then 
+                pJsonArray:Add(cast(pholder,IDateHolder):value).
+
+            when pHolder:GetClass():isA(get-class(IDateTimeHolder)) then 
+                pJsonArray:Add(cast(pholder,IDateTimeHolder):value). 
+
+            when pHolder:GetClass():isA(get-class(IDateTimeTzHolder)) then 
+                pJsonArray:Add(cast(pholder,IDateTimeHolder):value).  
+
+            when pHolder:GetClass():isA(get-class(IIntegerHolder)) then 
+                pJsonArray:Add(cast(pholder,IIntegerHolder):value). 
+
+            when pHolder:GetClass():isA(get-class(IInt64Holder)) then 
+                pJsonArray:Add(cast(pholder,IInt64Holder):value). 
+            
+             when pHolder:GetClass():isA(get-class(IDecimalHolder)) then 
+                pJsonArray:Add(cast(pholder,IDecimalHolder):value). 
+                
+            when pHolder:GetClass():isA(get-class(ILogicalHolder)) then
+                pJsonArray:Add(cast(pholder,ILogicalHolder):value). 
+
+            when pHolder:GetClass():isA(get-class(ILongcharHolder)) then
+                pJsonArray:Add(cast(pholder,ILongcharHolder):value). 
+            
+            otherwise 
+                undo, throw new UnsupportedOperationError(subst("Primitive Function &1 Return type '&1'",pHolder:GetClass():TypeName)).
+        end.                                                 
+    end method.         
+              
     method public static void AddToJson(pName as character,
                                         pHolder   as IPrimitiveHolder,
                                         pJson     as JsonObject):
@@ -543,6 +589,40 @@ class Pmfo.Util.PrimitiveHolderUtil:
         end.                                                 
     end method.              
     
+    method public static logical CompareToField(phField as handle,
+                                                pHolder as IPrimitiveHolder):
+        case true   :
+            when pHolder:GetClass():isA(get-class(ICharacterHolder)) then 
+                return phField:buffer-value = cast(pholder,ICharacterHolder):value.
+
+            when pHolder:GetClass():isA(get-class(IDateHolder)) then 
+                return phField:buffer-value = cast(pholder,IDateHolder):value.
+
+            when pHolder:GetClass():isA(get-class(IDateTimeHolder)) then 
+                return phField:buffer-value =cast(pholder,IDateTimeHolder):value. 
+
+            when pHolder:GetClass():isA(get-class(IDateTimeTzHolder)) then 
+                return phField:buffer-value =cast(pholder,IDateTimeHolder):value.  
+
+            when pHolder:GetClass():isA(get-class(IIntegerHolder)) then 
+                return phField:buffer-value =cast(pholder,IIntegerHolder):value. 
+
+            when pHolder:GetClass():isA(get-class(IInt64Holder)) then 
+                return phField:buffer-value =cast(pholder,IInt64Holder):value. 
+            
+             when pHolder:GetClass():isA(get-class(IDecimalHolder)) then 
+                return phField:buffer-value =cast(pholder,IDecimalHolder):value. 
+                
+            when pHolder:GetClass():isA(get-class(ILogicalHolder)) then
+                return phField:buffer-value =cast(pholder,ILogicalHolder):value. 
+
+            when pHolder:GetClass():isA(get-class(ILongcharHolder)) then
+                return phField:buffer-value =cast(pholder,ILongcharHolder):value. 
+            
+            otherwise 
+                undo, throw new UnsupportedOperationError(subst("Compare Field &1 to type '&2'",phField:name,pHolder:GetClass():TypeName)).
+        end.                                                 
+    end method.   
     
     method public static void AddToJson(pName as character,
                                         pHolder as IPrimitiveArrayHolder,

@@ -40,7 +40,7 @@ interface Pmfo.Core.DataLayer.IDataSource inherits IDataService, IDbQuery, IData
     define public property QueryStringWithoutParent as character  no-undo get.  
            
     method public logical Prepare(phBuffer as handle, pRequest as IGetDataTableRequest, pParentRequest as IGetDataTableRequest).
-    method public logical PrepareCurrent(phBuffer as handle, pParentRequest as IGetDataTableRequest).
+    method public IGetDataTableRequest PrepareCurrent(phBuffer as handle, pParentRequest as IGetDataTableRequest).
     method public logical Prepare(phBuffer as handle, pRequest as IGetDataTableRequest).
     // everything expect final query prepare - waiting for all data sources to be started  
     // to be able to add innerjoins 
@@ -55,5 +55,7 @@ interface Pmfo.Core.DataLayer.IDataSource inherits IDataService, IDbQuery, IData
     method public logical RefillCurrentRow().
     
     method public void FindSource(plock as integer).
+    // pass before buffer to fuond with before values
+    method public void FindSource(phBuffer as handle, pLock as integer).
     
 end interface.

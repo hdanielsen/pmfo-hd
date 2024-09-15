@@ -70,7 +70,7 @@ genspacp -password <text> [-user <text> -role <text> -domain <text> -file <text>
 
     method public character GetAttribute( input theUserId as integer, input attrName as character ):
         define variable cRoles as character no-undo init "PSCUser,PSCAdmin,PSCDebug".
-    
+  
         case attrname: 
             when "ATTR_ENABLED" then return "T".
             when "ATTR_LOCKED"  then return "F".

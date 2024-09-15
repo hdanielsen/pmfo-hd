@@ -78,6 +78,9 @@ using Pmfo.Tools.Gui.Model.IMonitor from propath.
 using Pmfo.Tools.Gui.Model.Monitor from propath.
 using Pmfo.Tools.Gui.Model.CancelError from propath.
 using Pmfo.Core.Manager.IServiceManager from propath.
+using Progress.Lang.AppError from propath.
+using Pmfo.Tools.Gui.Model.ISdoModel from propath.
+using Pmfo.Core.Error.NotImplementedError from propath.
  
 create widget-pool.
 
@@ -90,9 +93,13 @@ define variable CodeTableView      as ICodeTableView no-undo.
 define variable CodeConverter      as CodeConverter no-undo.
 define variable Theme              as ITheme no-undo.
 define variable CodeGeneratorClass as Progress.Lang.Class no-undo.
+define variable AdoModelClass      as Progress.Lang.Class no-undo.
+
 define variable Monitor            as IMonitor no-undo.
 define variable resourceModel      as IResourceModel  no-undo.
 define variable nameService        as INameService    no-undo.
+define variable sdoDirectories     as character no-undo.
+
 // optionalmodel for CodeTable - use SetCodeTableModel from application
 define variable codeTableModel     as ICodeTableModel no-undo. 
 define variable cTitle             as character init "Generate Code" no-undo.
@@ -131,6 +138,8 @@ define variable DefinitionDir  as character init "schema"  no-undo.
  
 {Pmfo/Tools/AppBuilder/resourcedata.i reference-only}
 {Pmfo/Tools/AppBuilder/fieldData.i }
+
+session:error-stack-trace = true.
 
 /* ************************  Function Prototypes ********************** */
 
@@ -274,7 +283,21 @@ define variable toOverwriteDS as logical
      view-as toggle-box 
      size 14 by 1 no-undo.
          
-     
+define variable toToggleAll as logical
+     label "All"               
+     view-as toggle-box               
+     size 9 by 1 no-undo.            
+
+define variable toToggleJoins as logical  
+     label "Exclude Joined Fields" 
+     view-as toggle-box 
+     size 22 by 1 no-undo.
+
+define variable toToggleCalcs as logical  
+     label "Exclude Calculated Fields" 
+     view-as toggle-box 
+     size 26 by 1 no-undo.
+                           
 define variable fiSDO as character format "X(256)":U 
      label "SDO Directory" 
      view-as fill-in 
@@ -377,27 +400,27 @@ define variable toNotInUse as logical
 
 define variable dlpFunctions as character 
      view-as selection-list single scrollbar-vertical 
-     size 35 by 9 no-undo.
+     size 35 by 8 no-undo.
 
 define variable dlpProcedures as character 
      view-as selection-list single scrollbar-vertical 
-     size 35 by 9 no-undo.
+     size 35 by 8 no-undo.
 
 define variable sdoFunctions as character 
      view-as selection-list single scrollbar-vertical 
-     size 35 by 9 no-undo.
+     size 35 by 8 no-undo.
 
 define variable sdoProcedures as character 
      view-as selection-list single scrollbar-vertical 
-     size 35 by 9 no-undo.
+     size 35 by 8 no-undo.
 
 define variable dataSourceMethods as character 
      view-as selection-list single scrollbar-vertical 
-     size 35 by 9 no-undo.
+     size 35 by 8 no-undo.
 
 define variable businessEntityMethods as character 
      view-as selection-list single scrollbar-vertical 
-     size 35 by 9 no-undo.
+     size 35 by 8 no-undo.
      
 define rectangle rGenerate 
     edge-pixels 1 graphic-edge  no-fill   rounded 
@@ -417,7 +440,7 @@ define variable raGenerateAllorOne as logical
 /* Definitions of the field level widgets                               */
 define variable edErrors as longchar 
      view-as editor scrollbar-vertical large 
-     size 73 by 9 no-undo.
+     size 73 by 8 no-undo.
 
 /* Definitions of the field level widgets                               */
 define variable edQuery as character 
@@ -434,7 +457,7 @@ define frame DEFAULT-FRAME
      fiSDO at row 4.4 col 29 colon-aligned  
      btnSdoDir at row 4.4  col 124
      
-     firectFilterTitle at row 1.4 col 178 colon-aligned no-label
+     firectFilterTitle at row 1.3 col 178 colon-aligned no-label
      rFilter at row 1.7 col 177.2
      toSDOs at row 2.2 col 178 colon-aligned no-label
      toNoSDOs at row 3.2 col 178 colon-aligned no-label
@@ -442,7 +465,7 @@ define frame DEFAULT-FRAME
      btnSearchCode at row 4.2 col 200 colon-aligned no-label
      
      
-     fiRectGeneratetitle at row 1.4 col 230 colon-aligned no-label
+     fiRectGeneratetitle at row 1.3 col 230 colon-aligned no-label
      rGenerate at row 1.7 col 229.2 
      toIncludes at row 2.2 col 230 colon-aligned
      toOverwriteInclude at row 2.2 col 253 colon-aligned
@@ -456,6 +479,9 @@ define frame DEFAULT-FRAME
      btnGenerate         at row 2.2  col 298
      btnRefreshService   at row 4.2  col 298
     
+     toToggleAll      at row 22.45 col 217
+     toToggleJoins    at row 22.45 col 226
+     toToggleCalcs    at row 22.45 col 252
      btnShowData      at row 22.45 col 292.5
      fiClassName      at row 23.5  col 19 colon-aligned
      fiResource       at row 24.7  col 19 colon-aligned  
@@ -468,10 +494,10 @@ define frame DEFAULT-FRAME
      fiBeMethodLabel       at row 22.8  col 65 no-label   
      businessEntityMethods at row 23.5  col 65 no-label 
      
-     fiErrorLabel          at row 33   col 65 no-label 
-     edErrors              at row 33.7 col 65 no-label
-     fiQueryLabel          at row 43   col 65 no-label 
-     edQuery               at row 43.7 col 65 no-label
+     fiErrorLabel          at row 32   col 65 no-label 
+     edErrors              at row 32.7 col 65 no-label
+     fiQueryLabel          at row 41   col 65 no-label 
+     edQuery               at row 41.7 col 65 no-label
      
      fiDSMethodLabel       at row 22.8 col 103 no-label
      dataSourceMethods     at row 23.5 col 103 no-label  
@@ -482,11 +508,11 @@ define frame DEFAULT-FRAME
      fiSdoProcLabel        at row 22.8 col 179 no-label
      sdoProcedures         at row 23.5 col 179 no-label  
      
-     fiDlpFuncLabel        at row 33   col 141 no-label
-     dlpFunctions          at row 33.7 col 141 no-label  
+     fiDlpFuncLabel        at row 32   col 141 no-label
+     dlpFunctions          at row 32.7 col 141 no-label  
      
-     fiSdoFuncLabel        at row 33   col 179 no-label
-     sdoFunctions          at row 33.7 col 179 no-label 
+     fiSdoFuncLabel        at row 32   col 179 no-label
+     sdoFunctions          at row 32.7 col 179 no-label 
      
     with 1 down no-box keep-tab-order overlay 
          side-labels no-underline three-d 
@@ -782,6 +808,9 @@ procedure CreateComponents :
    run CreateFieldBrowse.
    resourceModel:DefinitionDir = DefinitionDir. 
    run enable_UI.
+   catch e as Progress.Lang.Error :
+           
+   end catch.
 end procedure.
 
 
@@ -790,14 +819,36 @@ procedure CreateFieldBrowse :
  Purpose:
  Notes:
 ------------------------------------------------------------------------------*/
-    
     fieldBrowse = new FieldBrowse(frame DEFAULT-FRAME:handle).
     fieldBrowse:bind(table fieldData bind).   
     fieldBrowse:Init().
     fieldBrowse:row = sdoProcedures:row in frame default-frame.
-    fieldBrowse:col = 221.2. //231.2.
+    fieldBrowse:col = sdoProcedures:col in frame default-frame
+                    + sdoProcedures:width in frame default-frame
+                    + 3. 
+    
+    // toToggleCalcs:col = toToggleCalcs:col + iDelta.
+  //  toToggleJoins:col = toToggleJoins:col + iDelta.
+     
+    if resourceBrowse:col + resourceBrowse:width gt
+        fieldBrowse:col + fieldbrowse:width  then
+    do:     
+        fieldBrowse:col = fieldBrowse:col + 
+                          resourceBrowse:col + resourceBrowse:width
+                        - (fieldBrowse:col + fieldbrowse:width).
+                 
+       
+    end.
     fieldBrowse:View().  
-    fieldBrowse:Enable().  
+    toToggleAll:col = fieldBrowse:col + 2.4.
+    toToggleJoins:col = toToggleAll:col + toToggleAll:width + 2.
+    toToggleCalcs:col = toToggleJoins:col + toToggleJoins:width + 2.
+    fieldBrowse:Enable().
+    toToggleAll:sensitive = true.
+    toToggleCalcs:sensitive = true.
+    toToggleJoins:sensitive = true.
+    
+    btnShowData:col = fieldBrowse:col + fieldbrowse:width - btnShowData:width. 
     
     fieldBrowse:FieldValueChanged:subscribe("UpdateField") . 
 
@@ -814,11 +865,10 @@ procedure CreateCodeTableView :
          CodeTableView:Init().
          CodeTableView:row = fiDataSource:row in frame default-frame + 1.2 .
          CodeTableView:View().
-         CodeTableModel:PositionChanged:subscribe(CodeTableView:DisplayCodeTable).  
+         if valid-object(CodeTableModel) then
+            CodeTableModel:PositionChanged:subscribe(CodeTableView:DisplayCodeTable).  
      end.    
 end procedure.
-
-
 
 procedure CreateResourceBrowse :
 /*------------------------------------------------------------------------------
@@ -837,7 +887,8 @@ procedure CreateResourceBrowse :
     resourceBrowse:col = 3.
     resourceBrowse:View().  
     resourceBrowse:Enable().  
-    resourceBrowse:ValueChanged:subscribe("DisplayResource") . 
+    resourceBrowse:ValueChanged:subscribe("DisplayResource") .
+    
 end procedure.
 
 
@@ -910,7 +961,12 @@ procedure fetchResources:
  Purpose:
  Notes:
 ------------------------------------------------------------------------------*/
-   resourceModel:FetchData(fiSDO, Monitor).
+    // TODO cleanup - add to interface or consolidate into one  
+  // if num-entries(sdoDirectories) > 1 then 
+       cast(resourceModel,ResourceModel):FetchDataFromDirectores(sdoDirectories, Monitor).
+  // else
+    //   resourceModel:FetchData(fiSDO, Monitor).
+   
    run OpenQuery.
 
 end procedure.
@@ -920,7 +976,7 @@ procedure SensitizeResourceWidgets:
     if avail resourceData then 
     do with frame default-frame:
         assign
-            btnGenerate:sensitive = true
+        //    btnGenerate:sensitive = true
 /*            btnGenerate:sensitive = (toBusinessEntities or toDataSources or toIncludes)                                                                         */
 /*                                    and (avail resourceData                                                                                                     */
 /*                                         and (resourceData.NotFromData = false or resourceData.onlyInclude)                                                     */
@@ -938,7 +994,41 @@ procedure SensitizeResourceWidgets:
             . 
     end. 
 end.    
-
+procedure moveRectangles :
+    define input parameter pshrink as decimal.
+    do with frame default-frame:
+     //    btnShowData:col = btnShowData:col - pshrink.
+         firectFilterTitle:col = firectFilterTitle:col - pshrink.
+         firectGenerateTitle:col = firectGenerateTitle:col - pshrink.
+         rGenerate:col = rGenerate:col - pshrink.
+         rFilter:col = rFilter:col - pshrink.
+         toBusinessEntities:col = toBusinessEntities:col - pshrink.
+         todataSources:col = toBusinessEntities:col .
+         toIncludes:col = toBusinessEntities:col.
+         toDataFields:col = toDataFields:col - pshrink.
+         toSDOs:col = tosdos:col - pshrink.
+         toNoSDOs:col = tonosdos:col - pshrink.
+         btnGenerate:col = btnGenerate:col - pshrink.
+         btnRefreshService:col = btnRefreshService:col - pshrink.
+         raGenerateAllorOne:col = raGenerateAllorOne:col - pshrink.
+        // toNotInUse:col = toNotInUse:col - pshrink.
+         toOverwriteBE:col = toOverwriteBE:col - pshrink.
+         toOverwriteDS:col = toOverwriteDS:col - pshrink.
+         toOverwriteInclude:col = toOverwriteInclude:col - pshrink.
+         btnSearchCode:col = btnSearchCode:col - pshrink.
+         fiOutput:width  = fiOutput:width - (pshrink / 2).            
+         fiSourceOutput:width  = fiOutput:width.
+         fiSDO:width  =  fiOutput:width.                  
+         btnOutDir:col = fiOutput:col + fioutput:width + 1.
+         btnSdoDir:col =  btnOutDir:col.
+         btnOutSourceDir:col = btnOutDir:col.              
+/*         btnSdoDir:col =  btnSdoDir:col - pshrink.              */
+/*         btnOutSourceDir:col =  btnOutSourceDir:col - pshrink.  */
+         
+     
+    end.    
+end. 
+    
 procedure RefreshUI :
 /*------------------------------------------------------------------------------
  Purpose:
@@ -1126,24 +1216,36 @@ procedure DisplayResourceFields :
                                            StringConstant:LF + "        by ").
              if valid-object(resourceData.error) then
              do:   
+                 
                  edErrors         = GetErrorMessages(cast(resourceData.error,ErrorTracker)). 
-                 edErrors:bgcolor =  Theme:ErrorBg.
-                 edErrors:fgcolor =  Theme:ErrorFg.
+              //   edErrors:bgcolor =  Theme:ErrorBg.
+               //  edErrors:fgcolor =  Theme:ErrorFg.
              end.
              else 
              if resourceData.noCodes 
              or resourcedata.NotInUse 
-             or (resourcedata.tableName > "" and resourcedata.Tablename <> codeTableModel:CodeTableName and resourceData.definedinDb = false) then 
+             or (resourcedata.tableName > ""
+                   and (valid-object(codeTableModel) = false 
+                        or 
+                        resourcedata.Tablename <> codeTableModel:CodeTableName 
+                        )
+                    and resourceData.definedinDb = false
+                 ) then 
              do:
+             
                   edErrors = "".
                   if resourceData.noCodes then
-                 
-                      edErrors = subst("There is no data in the '&1' table for &2 &3.",
-                                       codeTableModel:CodeTableName, 
-                                       if codeTableModel:CodeTableKeyType = "integer" then codeTableModel:CodeTableKeyLabel else codeTableModel:CodeTableNameLabel,
-                                       if codeTableModel:CodeTableKeyType = "integer" then string(resourcedata.codeTableKey) else quoter(resourcedata.codeTableName)
-                                       ).
-                                       
+                  do:
+                      if valid-object(CodeTableModel) then
+                          edErrors = subst("There is no data in the '&1' table for &2 &3.",
+                                           codeTableModel:CodeTableName, 
+                                           if codeTableModel:CodeTableKeyType = "integer" then codeTableModel:CodeTableKeyLabel else codeTableModel:CodeTableNameLabel,
+                                           if codeTableModel:CodeTableKeyType = "integer" then string(resourcedata.codeTableKey) else quoter(resourcedata.codeTableName)
+                                           ).
+                      else
+                           edErrors = "There is no data in the CodeTable for this record". // ???
+                                           
+                  end.                     
                   if resourcedata.NotInUse then 
                   do:
                       if resourcedata.tableName > "" then
@@ -1155,14 +1257,13 @@ procedure DisplayResourceFields :
                   else if resourceData.noCodes = false then 
                       edErrors = (if edErrors > "" then edErrors + "~n~n" else "") + subst("The '&1' Table is not defined in any database.", resourcedata.tableName).   
                  
-                 edErrors:bgcolor =  Theme:WarningBg.
-                 edErrors:fgcolor =  Theme:WArningFg.
-
+                  edErrors:bgcolor =  Theme:WarningBg.
+                  edErrors:fgcolor =  Theme:WArningFg.
              end.
              else do:
-                 edErrors = "".
-                 edErrors:bgcolor = ?.  
-                 edErrors:fgcolor = ?.   
+                  edErrors = "".
+                  edErrors:bgcolor = ?.  
+                  edErrors:fgcolor = ?.   
              end.     
         end.        
         else 
@@ -1192,7 +1293,7 @@ procedure DisplayResourceFields :
             fiDataSource
             edQuery
             edErrors.      
-    end.
+    end.   
 end.    
 
 procedure DisplayResource :
@@ -1204,7 +1305,7 @@ procedure DisplayResource :
     
     define variable functions as ISet no-undo.
     define variable procedures as ISet no-undo.
-    define variable sdo as SdoModel no-undo.
+    define variable sdo as ISdoModel no-undo.
     define variable dlp as DlpModel no-undo.
     define variable datasource as DataSourceModel no-undo.
     define variable be as BusinessEntityModel no-undo.
@@ -1215,7 +1316,7 @@ procedure DisplayResource :
         dataFields = GetFields(table resourceData by-reference).
         if valid-object(resourceData.SdoModel) then 
         do:
-            sdo = cast(resourceData.SdoModel,SdoModel).
+            sdo = cast(resourceData.SdoModel,ISdoModel).
         end.    
         if valid-object(resourceData.DlpModel) then 
         do:
@@ -1227,14 +1328,16 @@ procedure DisplayResource :
         if not valid-object(resourceData.BusinessEntityModel) then do:
             resourceData.BusinessEntityModel = CreateBusinessEntity(input table resourceData by-reference).
         end.
-        be = cast(resourceData.BusinessEntityModel,BusinessEntityModel).  
+        be         = cast(resourceData.BusinessEntityModel,BusinessEntityModel).  
         datasource = cast(resourceData.DataSourceModel,DataSourceModel).
             
     end.
     
     run Fillfields(dataFields,avail resourceData and resourceData.codeTableName = "").    
-    run FillSdofunctions(if valid-object(sdo) then sdo:Functions else ?).
-    run FillSdoProcedures(if valid-object(sdo) then sdo:Procedures else ?).
+    if type-of(sdo,SdoModel) then
+        run FillSdofunctions(if valid-object(sdo) then cast(sdo,SdoModel):Functions else ?).
+    if type-of(sdo,SdoModel) then
+       run FillSdoProcedures(if valid-object(sdo) then cast(sdo,SdoModel):Procedures else ?).
     run FillDlpfunctions(if valid-object(dlp) then dlp:Functions else ?).
     run FillDlpProcedures(if valid-object(dlp) then dlp:Procedures else ?).
     run FillDataSourceMethods(if valid-object(datasource) then datasource:methods  else ?).
@@ -1278,13 +1381,34 @@ procedure enable_UI :
           toDataSources
           toBusinessEntities
       with frame DEFAULT-FRAME in window C-Win.
+      
+     if frame DEFAULT-FRAME:width gt session:width then
+     do:
+         run moveRectangles(frame DEFAULT-FRAME:width - session:width + 2).
+     end.
+     else do:
+         if rGenerate:col + rGenerate:width gt 
+         resourceBrowse:col + resourceBrowse:width then 
+         do:
+           run moveRectangles(
+              rGenerate:col + rGenerate:width
+              - (resourceBrowse:col + resourceBrowse:width)
+            ).
+         end.
+     end.
      
-  enable fiOutput 
+     if c-win:width gt resourceBrowse:col + resourceBrowse:width + 1 then
+        c-win:width = resourceBrowse:col + resourceBrowse:width + 1 .
+     
+     if c-win:height gt max(fieldBrowse:row + fieldBrowse:height,edQuery:row + edQuery:height)  then
+        c-win:height = max(fieldBrowse:row + fieldBrowse:height,edQuery:row + edQuery:height) .
+     
+     enable fiOutput 
          btnOutDir
          fiSourceOutput
          btnOutSourceDir 
-         fiSDO 
-         btnSdoDir 
+         fiSDO  
+         btnSdoDir  
          toSDOs
          toNoSDOs
          toDataFields
@@ -1367,6 +1491,7 @@ procedure FillFields :
     define input  parameter pSet as ISet no-undo.
     define input  parameter pEnableIsExcluded as logical no-undo.
     
+    
     define variable oIter  as IIterator no-undo.
     define variable oField as FieldModel no-undo.
     
@@ -1385,10 +1510,16 @@ procedure FillFields :
            fieldData.dataType = oField:dataType.
            fieldData.isExcluded = fieldData.isCalc. 
            fieldData.inSDO = ofield:inSDO.
+           fieldData.isJoin = ofield:IsJoin.
         end.
-    end.                                                                                                                                            
+    end.   
+                                                                                 
     fieldBrowse:OpenQuery().
-    if pEnableIsExcluded then fieldBrowse:EnableIsExcluded().
+    if pEnableIsExcluded then 
+    do:
+        toToggleCalcs = true.
+        fieldBrowse:EnableIsExcluded().
+    end.    
     else fieldBrowse:DisableIsExcluded().
 end procedure.
 
@@ -1440,7 +1571,7 @@ procedure Initialize :
    define variable hWin as handle no-undo.
    define variable oBar as IMonitorTarget   no-undo. 
    define variable iBar as integer no-undo.
-   
+   define variable lHasService as logical no-undo. 
    run Pmfo/Tools/Gui/winProgress.w persistent set hWin.
    Monitor = new Monitor().
    Extent(Monitor:Targets) = extent(resourceModel:MonitorSources).
@@ -1452,59 +1583,72 @@ procedure Initialize :
    Monitor:Targets[1]:Text = resourceModel:MonitorSources[1].
        
    if not valid-object(Application:StartupManager) then 
-   do:
+   do on error undo, throw:
+       
        if superLib > "" then
           run value(superLib) persistent.
           
        StartupManager:Instance. /* sets Application:StartupManager in contructor */
+       lHasService = true.
+       catch e as Progress.Lang.Error :
+           message "Failed to initialize Application" skip e:GetMessage(1)
+           view-as alert-box.    
+           
+       end catch.
    end.
    if not valid-object(Theme) then 
        Theme  = new DefaultTheme().  
    fieldBrowse:Theme = Theme.
    resourceBrowse:Theme = Theme.
-   
-   nameService = cast(Application:ServiceManager:getService(get-class(INameService)),INameService).   
   
-   resourceModel:NameService = nameService.
-   if valid-object(codeTableModel) then
+   if lHasService then
    do:
-       resourceModel:CodeTableModel = codeTableModel.
-       resourceBrowse:CodeTableModel = codeTableModel.
-       fieldBrowse:UnresolvedSerializeName = codeTableModel:UnresolvedSerializeName.
-   end.
-   
-   run CreateCodeTableView.
-    
-   if not valid-object(CodeConverter) then
-       CodeConverter = new CodeConverter().
-   
-   if not valid-object(CodeGeneratorClass) then
-       CodeGeneratorClass = get-class(CodeGenerator).
-   
-   if fiOutput = "" then 
-   do on error undo, throw:
-       run SetApplicationFolder(GetServiceManager():EntityDirectory).
-       catch e as Progress.Lang.Error :
-          message subst("Could not find SessionManager:EntityDirectory '&1' in propath",GetServiceManager():EntityDirectory) 
+       nameService = cast(Application:ServiceManager:getService(get-class(INameService)),INameService).   
+       resourceModel:NameService = nameService.
+       if valid-object(codeTableModel) then
+       do:
+           resourceModel:CodeTableModel = codeTableModel.
+           resourceBrowse:CodeTableModel = codeTableModel.
+           fieldBrowse:UnresolvedSerializeName = codeTableModel:UnresolvedSerializeName.
+       end.
+       if valid-object(AdoModelClass) then
+           resourceModel:AdoModelType = AdoModelClass.
           
-          view-as alert-box.   
-       end catch. 
+       run CreateCodeTableView.
+        
+       if not valid-object(CodeConverter) then
+           CodeConverter = new CodeConverter().
+       
+       if not valid-object(CodeGeneratorClass) then
+           CodeGeneratorClass = get-class(CodeGenerator).
+       
+       if fiOutput = "" then 
+       do on error undo, throw:
+           run SetApplicationFolder(GetServiceManager():EntityDirectory).
+           catch e as Progress.Lang.Error :
+              message subst("Could not find SessionManager:EntityDirectory '&1' in propath",GetServiceManager():EntityDirectory) 
+              
+              view-as alert-box.   
+           end catch. 
+       end.
+             
+       if fiSourceOutput = "" then    
+       do on error undo, throw:
+           run SetDataSourceFolder(GetServiceManager():DataSourceDirectory).
+           catch e as Progress.Lang.Error :
+              message subst("Could not find SessionManager:DataAccessDirectory '&1' in propath",GetServiceManager():EntityDirectory) 
+              
+              view-as alert-box.   
+           end catch. 
+       end.
+       run fetchResources.    
+       run refreshUI.      
    end.
-         
-   if fiSourceOutput = "" then    
-   do on error undo, throw:
-       run SetDataSourceFolder(GetServiceManager():DataSourceDirectory).
-       catch e as Progress.Lang.Error :
-          message subst("Could not find SessionManager:DataAccessDirectory '&1' in propath",GetServiceManager():EntityDirectory) 
-          
-          view-as alert-box.   
-       end catch. 
-   end.
-   run fetchResources.    
-   run refreshUI.      
+   
    initialized = true.
    
    C-Win:hidden = false no-error.
+    
    apply "close" to hWin.
    session:set-wait-state ("").
    
@@ -1694,6 +1838,7 @@ procedure GenerateCodeForSelectedRow:
         lEmergency = false. 
         if lOk then 
         do on error undo, throw:
+         
             pGenerator:Generate(rowid(resourceData), if resourceData.onlyInclude then false else toIncludes, toDataSources, toBusinessEntities,  input table resourceData by-reference,false).
             
             catch e as Progress.Lang.Error :
@@ -1702,7 +1847,8 @@ procedure GenerateCodeForSelectedRow:
                    lEmergency = AskEmergency(e,true). // true for plural message
                 end.
                 else 
-                   message e:GetMessage(1)
+                   message e:GetMessage(1) skip
+                   e:Callstack
                    view-as alert-box error. 
             end catch.
         end.
@@ -1803,6 +1949,16 @@ procedure SetCodeGeneratorClass :
    define input parameter pGeneratorClass as Progress.Lang.Class no-undo.
    CodeGeneratorClass = pGeneratorClass.
 end procedure.
+
+procedure SetAdoModelClass :
+/*------------------------------------------------------------------------------
+ Purpose: plug in optional view to display code table fields
+ Notes:
+------------------------------------------------------------------------------*/
+   define input parameter pAdoModelClass as Progress.Lang.Class no-undo.
+   AdoModelClass = pAdoModelClass.
+end procedure.
+
 
 procedure SetCodeTableModel :
 /*------------------------------------------------------------------------------
@@ -1921,9 +2077,32 @@ procedure SetSdoDirectory :
    
    assign fiSDO = getFullDirectoryPath(pcdir).
    display fiSDO with frame default-frame.
+   sdoDirectories = pcDir.
    if initialized then
        run SdoDirChanged(fiSdo). 
 end procedure.
+
+procedure SetSdoDirectories :
+/*------------------------------------------------------------------------------
+ Purpose:
+ Notes:
+------------------------------------------------------------------------------*/
+   define input parameter pcdirs as character no-undo.
+   if initialized then 
+       undo, throw new NotImplementedError("Set SDO directories (multiple) after initialize").
+   if num-entries(pcdirs) = 1 then 
+       run setSDOdirectory(pcDirs).
+   else do with frame default-frame:     
+       assign fiSDO = pcdirs.
+       sdoDirectories = pcDirs.
+       fiSDO:sensitive = true.
+       fiSDO:read-only = true.
+       btnSdoDir:sensitive = false.
+       display fiSDO with frame default-frame.
+   end.
+     
+end procedure.
+
 
 
 procedure ShowCode:
@@ -2080,7 +2259,7 @@ function CreateBusinessEntity returns BusinessEntityModel
     else     
         oErrorTracker = new ErrorTracker().
     oModel = CodeConverter:CreateBusinessEntity(resourceData.businessEntity,
-                                              cast(resourceData.SdoModel,SdoModel), 
+                                              cast(resourceData.SdoModel,ISdoModel), 
                                               cast(resourceData.DlpModel,DlpModel), 
                                               resourceData.resourceName,
                                               resourceData.tempTableName, 
@@ -2106,7 +2285,7 @@ function CreateDataSource returns DataSourceModel
     else     
         oErrorTracker = new ErrorTracker().
     oModel = CodeConverter:CreateDataSource(resourceData.dataSource, 
-                                          cast(resourceData.SdoModel,SdoModel), 
+                                          cast(resourceData.SdoModel,ISdoModel), 
                                           cast(resourceData.DlpModel,DlpModel), 
                                           resourcedata.tableName,
                                           resourceData.tempTableName, 
@@ -2117,7 +2296,13 @@ function CreateDataSource returns DataSourceModel
     if not valid-object(resourceData.Error) and oErrorTracker:HasMessage() then
         resourceData.Error = oErrorTracker.
      
-    return oModel.     
+    return oModel. 
+    
+    catch e as Progress.Lang.Error : 
+        message "Failed to convert Data Source Code. You must convert this manually." + "~n~n" + e:GetMessage(1) 
+        view-as alert-box.
+       
+    end catch.    
 end function.
 
 function GetBusinessEntityDirectory returns character 
@@ -2126,8 +2311,6 @@ function GetBusinessEntityDirectory returns character
  Purpose:
  Notes:
 ------------------------------------------------------------------------------*/    
-        message "service man entity" GetServiceManager():EntityDirectory
-        view-as alert-box.
     return getFullDirectoryPath(GetServiceManager():EntityDirectory).
 end function.
 
@@ -2143,10 +2326,14 @@ function GetFields returns ISet
         if valid-object(resourceData.SdoModel) then 
         do:
             if valid-object(resourceData.sdoFields) then
-                datafields = cast(resourceData.SdoFields,ISet).          
+            do:
+                datafields = cast(resourceData.SdoFields,ISet).
+            end.              
         end.   
         else if valid-object(resourceData.dbFields) then
+        do:
             datafields = cast(resourceData.dbFields,ISet).          
+        end.
         else if resourceData.codeTableName > "" then 
         do:
             if not valid-object(resourcedata.codeTableFields) then

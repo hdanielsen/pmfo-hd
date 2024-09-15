@@ -62,16 +62,16 @@ class Pmfo.Core.BusinessLogic.QueryBuilder.QuerySearchPredicateFields inherits Q
                 case oEntry:Join:
                     when JoinEnum:Or or when JoinEnum:OrNot then
                     do: 
-                        // TODO Progress can use multiple indexes also with different fields and OR (I think) 
+                        // TODO Progress can use multiple indexes also with different fields and OR  
  
                         if type-of(oEntry,IQueryPredicate) = false or cast(oEntry,IQueryPredicate):FieldName <> pcfieldName then 
                             return true.
                         // if it is the same field then return false if operators are not EQ or InList in both   
                         if (pOperator <> QueryOperatorEnum:Eq and pOperator <> QueryOperatorEnum:InList) then
                             return true.
-                              
-                        if  cast(oEntry,IQueryPredicate):operator <> QueryOperatorEnum:Eq  
-                        and cast(oEntry,IQueryPredicate):operator <> QueryOperatorEnum:InList then 
+                        
+                        if QueryOperatorEnum:Eq:Equals(cast(oEntry,IQueryPredicate):operator) = false      
+                        and QueryOperatorEnum:InList:Equals(cast(oEntry,IQueryPredicate):operator) = false then 
                         do: 
                             return true.  
                         end.

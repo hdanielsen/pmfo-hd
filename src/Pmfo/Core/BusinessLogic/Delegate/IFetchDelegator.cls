@@ -1,7 +1,7 @@
 
 /*------------------------------------------------------------------------
     File        : IFetchDelegator
-    Purpose     : Data Read Delegator (BusinessEntity)
+    Purpose     : Fetch Delegator (BusinessEntity)
     Syntax      : 
     Description : 
     Author(s)   : hdaniels
@@ -15,15 +15,10 @@
   ----------------------------------------------------------------------*/
  
 using Pmfo.Core.BusinessLogic.IReceiveDataEventArgs from propath.
+using Pmfo.Core.BusinessLogic.Delegate.IDataDelegator from propath.
  
 
-interface Pmfo.Core.BusinessLogic.Delegate.IFetchDelegator: 
-    define public property ClientOnly         as logical       no-undo get.  
-   // future if we move GetData to FetchDelegate here 
-    define public property Resource       as character no-undo get.                                                                                                                        
+interface Pmfo.Core.BusinessLogic.Delegate.IFetchDelegator inherits IDataDelegator: 
     define public property DefaultDataset as handle    no-undo get.
-   /*    method public ILifecycleScope PrepareFetch( input poRequest as IGetDataRequest, input phDataset as handle, output pClientInnerJoinTables as character, pCLientSort as IQuerySortEntry).*/
     method public void ReceiveData(pReceiveDataArgs as IReceiveDataEventArgs, phDataset as handle).
-    method public void AddWarning(pcMessage as character).        
-    method public character GetKeys(). 
 end interface.

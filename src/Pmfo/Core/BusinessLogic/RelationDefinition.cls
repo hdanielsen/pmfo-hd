@@ -23,6 +23,7 @@ class Pmfo.Core.BusinessLogic.RelationDefinition implements IRelationDefinition 
     /* the resource nameo on the other end */
     define public property PublicName     as character no-undo get. public set. // not public in interface - linkexpander uses this to correct  
     define public property Cardinality     as RelationTypeEnum no-undo get. set . 
+    define public property XRef            as logical no-undo get. set.
          
     constructor public RelationDefinition (pcParent as character, pcPublicname as character, pCardinality as RelationTypeEnum ):
         super ().

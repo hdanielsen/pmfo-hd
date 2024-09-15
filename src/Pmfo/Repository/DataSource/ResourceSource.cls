@@ -96,6 +96,9 @@ class Pmfo.Repository.DataSource.ResourceSource abstract inherits DataSource  :
             undo, throw new IllegalOperationError(subst("Source code directory '&1' not in propath",GetFileDirectory())). 
             
         catch e as Progress.Lang.Error :
+            message "throwing fill error" e:GetMessage(1) skip 
+             e:CallStack
+            view-as alert-box.
             ThrowFillError(e).    
         end catch.                  
     end method.

@@ -26,10 +26,14 @@ interface Pmfo.Core.BusinessLogic.IAction inherits IMethod:
      Table - calls the action once assuming the action does a for each
     */
     define public property ActionScope as ActionScopeEnum no-undo get. set.
+    
     // Actions data currently have row-state row-created, but it is assumed to contain 
     // existing data that will be checked accordingly (record exists and optimistic lock check)  
     // Set this to true for actions that have new data that is to be created   
-    define public property IsCreate  as logical no-undo get. set.
+    define public property IsCreate        as logical no-undo get. set.
+    
+    // Set to true for actions that is completely handled by the BE - no json and no key in url    
+    define public property IsEmpty as logical no-undo get. set.
     
     // optional CSV of temp-table (entity) field names to use to check optimistic locking. 
     // This allows request to post a subset of data  
@@ -59,13 +63,12 @@ interface Pmfo.Core.BusinessLogic.IAction inherits IMethod:
         
     method public void SetParameterExpression(pcTargetTableName as character, pcExpression as character).
     method public void SetParameters(pcTargetTableNAme as character, pParameters as IStringStringMap).
-//    method public void SetSuccessInfo(pcEntityName as character, pKeyValues as character extent).
- //   method public void GeSuccess().
      
-    method public logical HasClientMethod(pObject as Object, poUpdateDataRequest as IUpdateDataRequest, phDataset as handle).
-      
     method public Method GetClientMethod(pObject as Object, poUpdateDataRequest as IUpdateDataRequest, phDataset as handle, output pParameterList as ParameterList ).
-    
+    // the client method ClientParamterList will have reference to the UpdateDataRequest so we must allow it to be removed to ensure GBC working as expected
+    // Both the UpdateRequest and the Action (may) need to exist for a while after and it is difficult to have safe cleanup thayt works in allcases
+    // so this ensures that whoever calls and uses GetClientMethod can get rid of this to not prevent future GBC      
+    method public void RemoveClientMethod():
     // allow control of row-state and field values after find for keys in url   
     method public void PostFindUnique(pRequestedBuffer as handle).
     

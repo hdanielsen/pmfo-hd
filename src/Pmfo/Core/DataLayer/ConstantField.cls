@@ -79,6 +79,7 @@ class Pmfo.Core.DataLayer.ConstantField implements IConstantField:
     end constructor.
     
     method public logical Assign(phDbfield as handle).
+       
         case phDbField:data-type:
             when 'character' then 
                 phDbfield:buffer-value = PrimitiveHolderUtil:GetCharacterValue(Holder).
@@ -88,7 +89,8 @@ class Pmfo.Core.DataLayer.ConstantField implements IConstantField:
                 phDbfield:buffer-value = PrimitiveHolderUtil:GetLogicalValue(Holder).
             otherwise        
                 undo, throw new NotImplementedError(subst("Save of Constant field for Data Type",phDbfield:data-type)).           
-            end.
+        end.
+        return true.    
     end method. 
     
     // The value is not Identifer for this - need to ensure only one in collections

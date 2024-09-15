@@ -24,6 +24,7 @@
                   used to get all data from server before the actual execution
                   of the action   
                 - Also supports building the request from temp-table records with only keys
+                - TODO: consolidate overlap with RequestUtil  
   ----------------------------------------------------------------------*/
 
 block-level on error undo, throw.

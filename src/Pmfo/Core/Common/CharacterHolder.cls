@@ -18,6 +18,7 @@
 
 using Progress.Lang.*.
 using Ccs.Common.Support.ICharacterHolder.
+using Ccs.Common.Support.ILongcharHolder from propath.
 
 block-level on error undo, throw.
 
@@ -34,5 +35,37 @@ class Pmfo.Core.Common.CharacterHolder implements ICharacterHolder:
     method override public character ToString():
         return string(this-object:Value).
     end method.
-
+    
+    method override public logical Equals(input PO as Progress.Lang.Object):
+        define variable oString as OpenEdge.Core.String no-undo.
+        define variable valCompare as character no-undo.
+        if super:Equals(PO) then
+             return true.
+         
+        if type-of(PO, OpenEdge.Core.String) then
+        do:
+            oString = cast(PO, OpenEdge.Core.String).
+            return 
+                this-object:Value = oString:Value.
+        end.
+        else
+        if type-of(PO, ICharacterHolder) then
+        do:
+            valCompare = dynamic-property(PO, 'Value').
+            If this-object:Value eq valCompare then 
+                return true.
+        end.
+        else
+        if type-of(PO, ILongcharHolder) then
+        do on error undo, throw:
+            valCompare = dynamic-property(PO, 'Value').
+            If this-object:Value eq valCompare then 
+                return true.
+            catch e as Progress.Lang.Error :
+                return false.    
+            end catch.   
+        end.
+        return false.
+    end method.
+    
 end class.

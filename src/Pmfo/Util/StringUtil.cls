@@ -91,6 +91,17 @@ class Pmfo.Util.StringUtil:
                return "a".     
     end method.    
     
+    method public static logical HasNumber(pcword as character):
+        define variable i as integer no-undo.
+        if IsInteger(pcWord) then
+            return true.
+        do i = 1 to 9:
+            if index(pcword,string(i)) > 0 then
+                return true.
+        end.
+        return false.       
+    end method.    
+    
     /* return the second entry of a paired list if the name is first of the pair
        return blank if not found 
        The main purpose of this is to not get tripped by same name entries in the 
@@ -573,10 +584,19 @@ class Pmfo.Util.StringUtil:
     end method.  
     
     method static character RemoveEntryFromList(piEntry as integer, pcList as character ):
-        if num-entries(pcList) >= piEntry then 
+        return RemoveEntryFromList(piEntry,pcList,",").
+    end method.
+    method static character RemoveEntryFromList(piEntry as integer, pcList as character, pcDelimiter as characte ):
+        if num-entries(pcList,pcDelimiter) >= piEntry then 
         do: 
-            entry(piEntry,pcList) = "".
-            return trim(replace(pcList,",,",","),",").
+            entry(piEntry,pcList,pcDelimiter) = "".
+             
+            return trim(replace(pcList,
+                                 // avoid error 984 replace does not handle non zero length param  
+                                subst("&1&1",if pcDelimiter = "" then StringConstant:SPACE else pcDelimiter),
+                                pcDelimiter  
+                                ),
+                                pcDelimiter).
         end.   
         else 
             undo, throw new OutOfBoundsError(pientry).
@@ -584,15 +604,26 @@ class Pmfo.Util.StringUtil:
     end method.
     
     method static character RemoveEntryFromList(pcEntry as character, pcList as character ):
+        return RemoveEntryFromList(pcentry, pcList,","). 
+    end method.
+    method static character RemoveEntryFromList(pcEntry as character, pcList as character, pcDelimiter as character ):
         define variable iLookup as integer no-undo.
-        iLookup = lookup(pcEntry,pcList).
+        iLookup = lookup(pcEntry,pcList,pcDelimiter).
         if iLookup > 0 then 
         do:            
-            return RemoveEntryFromList(iLookup, pcList). 
+            return RemoveEntryFromList(iLookup, pcList,pcDelimiter). 
         end.
         else 
             return pcList.
                 
+    end method.
+    
+    method public static character AppendEntry(pcString as character,pcAppend as character): 
+        return AppendEntry(pcString,pcAppend,",").
+    end method.    
+      
+    method public static character AppendEntry(pcString as character,piAppend as integer): 
+        return AppendEntry(pcString,string(piAppend)). 
     end method.
     
     method public static character AppendEntry(pcString as character,pcAppend as character,pcdlm as character): 
@@ -603,13 +634,6 @@ class Pmfo.Util.StringUtil:
         return trim(subst("&1&3&2",pcString,pcAppend,pcDlm),pcdlm).
     end method.    
     
-    method public static character AppendEntry(pcString as character,pcAppend as character): 
-        return AppendEntry(pcString,pcAppend,","). .
-    end method.    
-      
-    method public static character AppendEntry(pcString as character,piAppend as integer): 
-        return AppendEntry(pcString,string(piAppend)). 
-    end method.
           
     // convert a string date to a strign with specified date format    
     method static public character StringDateFromIsoDate(pcDate as character):
@@ -699,6 +723,16 @@ class Pmfo.Util.StringUtil:
         
     end.   
     
+    method static public logical WordHasNumber(pcWord as character):
+        define variable i as integer no-undo.
+        if index(pcWord,"") > 0 then
+            undo, throw new IllegalArgumentError(subst("Word '&1' has space(s)",pcWord)).
+        do i = 1 to 9:
+           if index(pcWord,string(i)) > 0 then
+               return true.
+        end.  
+        return false.  
+    end method.
     
     method static public character TitleFormat(pcData as character):
         define variable cNewName as character no-undo.
@@ -706,9 +740,17 @@ class Pmfo.Util.StringUtil:
         define variable cWord as character no-undo.
         do i = 1 to num-entries(pcData," ").
             cword = entry(i,pcData," ").
-            if cword > "" then 
-               cNewName = (if cNewName > "" then cNewName + " " else "")
-                          + caps(substr(cword,1,1)) + lc(substr(cWord,2)). 
+            if cword > "" then
+            do: 
+                if (length(cWord) > 2 
+                    or 
+                    (length(cWord) <=2 and compare(caps(cWord),"=",cWord,"case-sensitive") = false)
+                    ) 
+                and WordHasNumber(cWord) = false  then
+                    cWord = UpperCaseFirst(lc(cWord)).
+                        
+                cNewName = AppendEntry(cNewName,cWord," ").
+            end.               
         end.
         return cNewName.
     end.
@@ -719,6 +761,10 @@ class Pmfo.Util.StringUtil:
         catch e as Progress.Lang.Error :
             return false.    
         end catch. 
+    end.   
+    
+    method static public logical IsBlank(pcData as character):
+        return length(trim(pcData)) = 0 or length(trim(pcData)) = ?.
     end.   
     
     method static public character CamelToWords(pcData as character):
@@ -749,6 +795,31 @@ class Pmfo.Util.StringUtil:
         return cWords.
     end.
     
+    method static public character UnderscoreToCamelCase(pcData as character):
+        define variable cChar as character no-undo.
+        define variable i as integer no-undo.
+        define variable cWords as character no-undo.
+        define variable lNextCap as logical no-undo.
+        
+        do i = 1 to length(pcData):
+           cChar = substr(pcData,i,1).
+           if lNextCap then
+           do: 
+               cWords = cWords + caps(cChar).
+               lNextCap = false.
+           end.
+           else do:
+               if cChar = "_" then 
+                   lNextCap = true.
+               else do: 
+                   cWords = cWords + cChar.
+               end.            
+           end.
+        end.    
+        return cWords.
+    end.
+    
+    
     method public static character StripBadChars ( input pcString as character ):
         assign
             pcString = replace(pcString, "#", "num")
@@ -759,7 +830,7 @@ class Pmfo.Util.StringUtil:
             .
         return pcString.
     end method. /* stripBadChars */
-    
+     
     // Ignoree whitespace differneces (but keep single spaces)
     method public static logical EqualsIgnoreWhiteSpace(pcString1 as character, pcString2 as character): 
         do while index("  ",pcString1) <> 0:

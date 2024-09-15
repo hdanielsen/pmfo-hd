@@ -1,13 +1,13 @@
  
- /*------------------------------------------------------------------------
-    File        : DataSourceDS
-    Purpose     : 
-    Syntax      : 
-    Description : 
-    Author(s)   : hdaniels
-    Created     : Fri Mar 22 11:57  EDT 2019
-    Notes       : 
-  ----------------------------------------------------------------------*/
+/*------------------------------------------------------------------------
+   File        : DataSourceDS
+   Purpose     : 
+   Syntax      : 
+   Description : 
+   Author(s)   : hdaniels
+   Created     : Fri Mar 22 11:57  EDT 2019
+   Notes       : 
+ ----------------------------------------------------------------------*/
 
 
 block-level on error undo, throw.
@@ -92,7 +92,7 @@ class Pmfo.Repository.DataSource.DataSourceDS inherits ResourceSource:
     method protected void CleanupDataSource (input table ttDataSource):
         for each ttdatasource where ttDataSource.ClassName > "":
             if  search(subst("&1.r",replace(ttDataSource.ClassName,".","/"))) = ? 
-            and search(subst("&1.cls",replace(ttDataSource.ClassName,".","/"))) = ? then
+                and search(subst("&1.cls",replace(ttDataSource.ClassName,".","/"))) = ? then
                 delete ttDataSource. 
         end.    
     end method.     

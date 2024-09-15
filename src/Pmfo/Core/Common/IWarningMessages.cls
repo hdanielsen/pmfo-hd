@@ -21,6 +21,8 @@ interface Pmfo.Core.Common.IWarningMessages:
     method public logical Add(pcEntity as character, pcMessage as character).
     method public logical Add(pcEntity as character, pcMessage as character, pcFieldName as character).
     method public logical AddAll (pcResource as character,poWarnings as IWarningMessages).
+    method public logical Clear ().
+    
     method public IWarning extent GetWarnings().
     method public JsonArray ToJsonArray() :         
 end interface.

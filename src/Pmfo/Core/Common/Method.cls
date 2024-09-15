@@ -50,8 +50,12 @@ class Pmfo.Core.Common.Method abstract implements IMethod:
     // what to call the type in error message 
     define public abstract property BaseTypeName  as character no-undo get.
     define public abstract property IsPrimitive   as logical   no-undo get. set.
-    // only function as of current
-   // define public abstract property Binding       as MethodBindingEnum no-undo get. set.
+    define public abstract property Binding       as MethodBindingEnum no-undo get. set.
+    
+    // set to true if the method needs foreignkey value(s) from parent
+    // note - added 6/27/2024 for openAPi, but is typically used at run time when defined after this
+    // -  but may not be set for all methods
+    define public property RequiredParent  as character no-undo get. set.
       
     define protected property IsCreated as logical no-undo get. set.
      
@@ -61,7 +65,7 @@ class Pmfo.Core.Common.Method abstract implements IMethod:
     // by the same ABL method but we need to know which one    
     define public property CurrentParameterNames as character no-undo get. protected set.
        
-    define protected property Signatures       as ISignature extent no-undo  
+    define public property Signatures       as ISignature extent no-undo  
         get(pi as integer):
             if IsCreated = false then 
             do:
@@ -72,7 +76,14 @@ class Pmfo.Core.Common.Method abstract implements IMethod:
         end. 
         protected set.  
     
-    define public property Name             as character         no-undo get. protected set. 
+    define public property Name               as character         no-undo get. protected set. 
+    define public property IsDeprecated      as logical           no-undo  get. set.
+     // optional warning text for deprecated method
+    define public property DeprecatedWarning as character         no-undo  get. set.
+    // optional info about how to replace the call. i.e the issue that should be implemented to eliminate this usage 
+    define public property DeprecatedRemoveCallInfo as character        no-undo  get. set.
+   
+   
     define public property SingleObject     as logical           no-undo get. 
        set(plSingle as logical):
            AssertSingleObject(plSingle).
@@ -455,8 +466,9 @@ class Pmfo.Core.Common.Method abstract implements IMethod:
         do on error undo, throw:
             // The parser does not detect bad character after the right bracket 
             if (string(pcValue) matches "[*]") = false then
+            do:
                 undo, throw new BadRequestError(subst(cBadArrayTemplate,pParameter:name,pcValue)).      
-            
+            end.
             oJsonArray = cast(oJsonParser:Parse(pcValue),JsonArray).
              
             catch e1 as BadRequestError :
@@ -615,7 +627,7 @@ class Pmfo.Core.Common.Method abstract implements IMethod:
         define variable iInt64          as int64      no-undo.
         define variable cQuote          as character no-undo.
         define variable iStart          as integer no-undo.
-        
+        define variable cValuesAsString as longchar no-undo.
         if IsCreated = false then 
         do:
             IsCreated = true.
@@ -646,7 +658,7 @@ class Pmfo.Core.Common.Method abstract implements IMethod:
         CurrentParameterNames = cParameterNames. // public - see definition 
         
         iStart = PrepareParameters(extent(oSignature:Parameters)).
-        
+        proploop:
         do i = iStart to extent(oSignature:Parameters) on error undo, throw:
             
             cValue = if valid-object(pParameterMap) 
@@ -664,8 +676,57 @@ class Pmfo.Core.Common.Method abstract implements IMethod:
             end.
             else do:  
                 if oSignature:Parameters[i]:IsArray then 
-                    undo, throw new BadRequestError(subst("Parameter '&1' is an  array and the value must be in brackets",oSignature:Parameters[i]:name)). 
-                            
+                do:
+                    // ? is nothing found = blank is empty 
+                    cValuesAsString = GetStringValuesIntendedForArrayParam(oSignature:Parameters[i]).
+/*                    // handle primitive clients like OpenAPi that does not support brackests in URL query paramter value*/
+/*                    // (pi                                                                                              */
+/*                    // but instread passes multiple paramters with same name                                            */
+/*                    // not handled by Progress...                                                                       */
+/*                    define variable iLoop as integer no-undo.                                                           */
+/*                    define variable cQuery as character no-undo.                                                        */
+/*                    define variable cQueryString as character no-undo.                                                  */
+/*                    define variable iPos as integer no-undo.                                                            */
+/*                    define variable cProp as character no-undo.                                                         */
+/*                    define variable cValuesAsString as character no-undo.                                               */
+/*                    cQueryString = web-context:get-cgi-value("ENV":U, "QUERY_STRING":U).                                */
+/*                    do iLoop = 1 to num-entries(cQueryString,"&"):                                                      */
+/*                        cQuery = entry(iLoop, cQueryString,"&":U).                                                      */
+/*                        assign iPos  = index(cQuery, '=':u).                                                            */
+/*                        if iPos eq 0 then                                                                               */
+/*                            assign iPos = index(cQuery, ';':u).                                                         */
+/*                                                                                                                        */
+/*                        if iPos eq 0 then                                                                               */
+/*                            assign cProp  = cQuery                                                                      */
+/*                                   cValue = '':u.                                                                       */
+/*                        else                                                                                            */
+/*                        do:                                                                                             */
+/*                            assign cProp = substring(cQuery, 1, iPos - 1)                                               */
+/*                                   cValue = substring(cQuery, iPos + 1)                                                 */
+/*                                   no-error.                                                                            */
+/*                            if cValue eq ? then                                                                         */
+/*                                assign cValue = '':u.                                                                   */
+/*                                                                                                                        */
+/*                        end.                                                                                            */
+/*                        // only support this for aliases ()                                                             */
+/*                        if OpenEdge.Net.URI:Decode(cProp) = subst("@&1",oSignature:Parameters[i]:name) then             */
+/*                        do:                                                                                             */
+/*                            cValuesAsString = StringUtil:AppendEntry(                                                   */
+/*                                              cValuesAsString,                                                          */
+/*                                              string(OpenEdge.Net.URI:Decode(string(cValue)))                           */
+/*                                              ).                                                                        */
+/*                                                                                                                        */
+/*                        end.                                                                                            */
+/*                                                                                                                        */
+/*                    end.                                                                                                */
+                    if cValuesAsString <> ? then
+                    do:
+                        SetArrayParameter(oSignature:Parameters[i], i,subst("[&1]",cValuesAsString)).  
+                        next proploop.
+                    end.
+                    else 
+                        undo, throw new BadRequestError(subst("Parameter '&1' is an array and the value must be in brackets",oSignature:Parameters[i]:name)). 
+                end.            
                 cStringType = DataTypeHelper:GetMask(oSignature:Parameters[i]:DataType) .
                 cOriginalValue = cValue. // for error messages          
                 // unknown values may be quoted - 
@@ -870,6 +931,15 @@ class Pmfo.Core.Common.Method abstract implements IMethod:
         return true. // all signatures have parameters if we get here.   
     end method.
     
+      // allow openapi to create parameters 
+    method public void InitializeSignatures():
+        if IsCreated = false then 
+        do:
+            IsCreated = true.
+            CreateParameters().
+        end.
+    end method. 
+      
     // FOr Catalog - final - manages IsCreated
     method public final JsonArray DescribeSignatures(pcPath as character, phBuffer as handle):
         define variable jsonSigArray as JsonArray no-undo.
@@ -879,11 +949,7 @@ class Pmfo.Core.Common.Method abstract implements IMethod:
         define variable i as integer no-undo.
         define variable j as integer no-undo.
        
-        if IsCreated = false then 
-        do:
-            IsCreated = true.
-            CreateParameters().
-        end.
+        InitializeSignatures().
         
         if extent(Signatures) <> ? then
         do:
@@ -922,6 +988,51 @@ class Pmfo.Core.Common.Method abstract implements IMethod:
     method protected void CreateParameters(): 
     end method.      
     
+    // hack
+    method protected longchar GetStringValuesIntendedForArrayParam(pParameter as IParameter):
+        // handle primitive clients like OpenAPi that does not support brackests in URL query paramter value
+        // (pi
+        // but instread passes multiple paramters with same name 
+        // not handled by Progress...  
+        define variable iLoop as integer no-undo.
+        define variable cQuery as character no-undo.
+        define variable cQueryString as character no-undo.
+        define variable iPos as integer no-undo.
+        define variable cProp as character no-undo.
+        define variable cValuesAsString as character init ? no-undo.
+        define variable cValue          as longchar   no-undo.
+        cQueryString = web-context:get-cgi-value("ENV":U, "QUERY_STRING":U).
+        do iLoop = 1 to num-entries(cQueryString,"&"):
+            cQuery = entry(iLoop, cQueryString,"&":U).
+            assign iPos  = index(cQuery, '=':u).
+            if iPos eq 0 then
+                assign iPos = index(cQuery, ';':u).
+                
+            if iPos eq 0 then
+                assign cProp  = cQuery
+                       cValue = '':u.
+            else
+            do:
+                assign cProp = substring(cQuery, 1, iPos - 1)
+                       cValue = substring(cQuery, iPos + 1)
+                       no-error.
+                if cValue eq ? then
+                    assign cValue = '':u.
+                    
+            end.
+            // only support this for aliases ()
+            if OpenEdge.Net.URI:Decode(cProp) = subst("@&1",pParameter:name) then
+            do:
+                cValuesAsString = StringUtil:AppendEntry(
+                                  cValuesAsString,
+                                  string(OpenEdge.Net.URI:Decode(string(cValue)))
+                                  ).
+                           
+            end.     
+        end.
+        return cValuesAsString.
+    end method.
+        
     method public override  character ToString():
         define variable i as integer no-undo.
         define variable cString as character no-undo.

@@ -24,12 +24,23 @@ using Progress.Lang.Object from propath.
 using Progress.Lang.ParameterList from propath.
 using OpenEdge.BusinessLogic.NamedQuery from propath.
 using Pmfo.Core.BusinessLogic.DatasetManager.IDatasetUpdateManager from propath.
+using Pmfo.Core.BusinessLogic.Action from propath.
+using Pmfo.Core.Common.IGetDataMessages from propath.
+using Pmfo.Core.Common.GetDataMessages from propath.
 
 class Pmfo.Core.BusinessLogic.UpdateDataRequest inherits UpdateDataRequest implements IUpdateDataRequest: 
     define public property RequestType         as RequestTypeEnum  no-undo get. set. 
     define public property MainRequestedBuffer as character        no-undo get. set. 
     define public property Confirmations       as character        no-undo get. protected set. 
-     
+    
+    define public property Messages as IGetDataMessages  no-undo 
+        get():
+            if not valid-object(Messages) then 
+                Messages = new GetDataMessages().
+            return Messages.    
+        end.    
+        protected set.
+        
     /* Optional comma separated list of tables that do not need or do not have
        an update target - read-only - yse Add- and RemoveNoTargetTable to edit */
     define public property NoTargetTables      as character no-undo get. protected set.
@@ -80,7 +91,7 @@ class Pmfo.Core.BusinessLogic.UpdateDataRequest inherits UpdateDataRequest imple
     method public void RemoveAction().
         if valid-object(Action) then 
         do:
-            // Garbage Collection will get rid if the class 
+            // Garbage Collection will get rid if the class
             CustomRequest = ?.
         end.
         else 
@@ -200,11 +211,19 @@ class Pmfo.Core.BusinessLogic.UpdateDataRequest inherits UpdateDataRequest imple
         return false. 
             
     end method.
-    
+     
     method public Progress.Reflect.Method GetClientMethod(pObject as Object, phDataset as handle,output pClientParameterList as ParameterList):
         if valid-object(CustomRequest) and type-of(CustomRequest,IAction) then
             return cast(CustomRequest,IAction):GetClientMethod(pObject,this-object, phDataset, output pClientParameterList).
         return ?.    
+    end method.
+
+    // The call to GetClientMethod may create a ClientParamterList with reference to this-object.
+    // This is to be called after the method returned from GetClientMethod has been used to ensure GBC working as expected
+    // later for the action and updateDataRequest      
+    method public void RemoveClientMethod():
+        if valid-object(Action) then
+            Action:RemoveClientMethod().
     end method.
     
     method public character GetConfirmedQuestions  ( pcSourceEntityname as character):
@@ -239,6 +258,8 @@ class Pmfo.Core.BusinessLogic.UpdateDataRequest inherits UpdateDataRequest imple
        
        return cConfirmations.
    end.     
+   
+   
    
    method public override character ToString():
        return right-trim(subst("MainRequestedBuffer:&1 RequestType:&2&3&4&5&6",

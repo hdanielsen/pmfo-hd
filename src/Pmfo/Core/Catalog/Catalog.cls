@@ -45,7 +45,8 @@ class Pmfo.Core.Catalog.Catalog inherits DataService implements ICatalog, IEntit
     define public property CanRead        as logical   init true      no-undo get.
     define public property ClientOnly     as logical                  no-undo get.
     define public property ServerType     as ServerTypeEnum           no-undo get. protected set. 
-    
+    define public property IsDeprecated   as logical                  no-undo get. protected set.   
+     
     define public property ServiceManager as IServiceManager no-undo
         get():
             return cast(Application:ServiceManager,IServiceManager).
@@ -172,4 +173,6 @@ class Pmfo.Core.Catalog.Catalog inherits DataService implements ICatalog, IEntit
     
     method public override void Destroy():
     end method.
+    
+   
 end class.

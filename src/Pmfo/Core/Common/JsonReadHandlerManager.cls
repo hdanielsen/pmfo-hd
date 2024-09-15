@@ -20,8 +20,10 @@ using Pmfo.Core.BusinessLogic.IJsonReadHandler from propath.
 using Pmfo.Core.BusinessLogic.RowStateEnum from propath.
 using Pmfo.Core.Error.IllegalStateError from propath.
 using Progress.Json.ObjectModel.JsonObject from propath.
+using Pmfo.Core.BusinessLogic.IJsonExtendedReadHandler from propath.
+using Pmfo.Util.JsonReader from propath.
 
-class Pmfo.Core.Common.JsonReadHandlerManager implements IJsonReadHandler: 
+class Pmfo.Core.Common.JsonReadHandlerManager implements IJsonExtendedReadHandler: 
     /*------------------------------------------------------------------------------
      Purpose:
      Notes:
@@ -32,16 +34,16 @@ class Pmfo.Core.Common.JsonReadHandlerManager implements IJsonReadHandler:
     
     define protected property DefaultReadHandler as IJsonReadHandler no-undo get. protected set. 
     
-    define protected variable CurrentReader as IJsonReadHandler no-undo.     
-    
+    define protected variable CurrentReader as IJsonReadHandler no-undo.
+     
     constructor public JsonReadHandlerManager (pHandlerMap as IMap ):
         super ().
         HandlerMap = pHandlerMap.
     end constructor.
     
-    constructor public JsonReadHandlerManager (pDefaulHandler as IJsonReadHandler, pcEntityName as character, poHandler as IJsonReadHandler ):
+    constructor public JsonReadHandlerManager (pDefaultHandler as IJsonReadHandler, pcEntityName as character, poHandler as IJsonReadHandler ):
         super ().
-        DefaultReadHandler = pDefaulHandler.
+        DefaultReadHandler = pDefaultHandler.
         HandlerMap = new Map().
         HandlerMap:Put(new String(pcEntityName),poHandler).  
     end constructor.
@@ -55,10 +57,17 @@ class Pmfo.Core.Common.JsonReadHandlerManager implements IJsonReadHandler:
             HandlerMap:Put(new String(pcEntityNames[i]),poHandlers[i]).  
         end.    
     end constructor.
+      
+    constructor public JsonReadHandlerManager (pDefaultHandler as IJsonReadHandler,
+                                               pcEntityNames as character extent, 
+                                               poHandlers as IJsonReadHandler extent):
+        this-object (pcEntityNames,poHandlers).
+        DefaultReadHandler = pDefaultHandler.
+    end constructor.
     
     method public logical CheckReadOnlyAndPrepareBuffer( phBuffer as handle, pState as RowStateEnum).
        CurrentReader = GetHandler(phBuffer).
-       if not valid-object (CurrentReader) then 
+       if not valid-object (CurrentReader) then
            undo, throw new IllegalStateError(subst("The JsonReadHandleManager cannot find a handler for entity '&1'",phbuffer:table-handle:serialize-name)).
             
        return CurrentReader:CheckReadOnlyAndPrepareBuffer(phBuffer,pState).
@@ -76,7 +85,14 @@ class Pmfo.Core.Common.JsonReadHandlerManager implements IJsonReadHandler:
         end.
         return oReader.
     end.
-     
+    
+    method public logical CheckOrSkipRow(pJson as JsonObject, phBuffer as handle, pReader as JsonReader).
+        if type-of(CurrentReader,IJsonExtendedReadHandler) then 
+            return cast(CurrentReader,IJsonExtendedReadHandler):CheckOrSkipRow(pJson, phBuffer, pReader).
+        else
+            return false.    
+    end method.
+  
     method public logical ReadField( pjson as JsonObject,phfld as handle):
         return CurrentReader:ReadField(pjson, phfld). 
     end method.   

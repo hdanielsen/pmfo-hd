@@ -26,30 +26,36 @@ class Pmfo.Core.BusinessLogic.QueryBuilder.QueryRenameTableQualifiers inherits Q
      Purpose:
      Notes:
     ------------------------------------------------------------------------------*/
-    define protected property TableRenames as character no-undo get. protected set.
     
-    constructor public QueryRenameTableQualifiers (pcTableRenames as character, plRenameisFirstEntry as logical):  
-        define variable cSwitchedlist as character no-undo.
-        define variable i as integer no-undo.
-        define variable cDlm as character no-undo.
-       
+    define protected property RenameisFirstEntry as logical no-undo get. set.
+    
+    // public to allow update of new maps when parsing many queries
+    define public property TableRenames as character no-undo 
+        get. 
+        set(pcTableRenames as character):
+            define variable i as integer no-undo.
+            define variable cSwitchedList as character no-undo.
+            define variable cDLm as character no-undo.  
+            if RenameisFirstEntry then 
+            do:
+                do i = 1 to num-entries(pcTableRenames) by 2:
+                    cSwitchedList = subst("&1&2&3,&4",cSwitchedList,cDlm,entry(i + 1,pcTableRenames),entry(i,pcTableRenames)).
+                    cDlm = ",".
+                end.     
+                TableRenames = cSwitchedList.
+            end.
+            else 
+                TableRenames = pcTableRenames.
+        end.    
+    
+    constructor public QueryRenameTableQualifiers (plRenameisFirstEntry as logical):  
         super ().
-        
-        if plRenameisFirstEntry then 
-        do:
-            do i = 1 to num-entries(pcTableRenames) by 2:
-                cSwitchedList = subst("&1&2&3,&4",cSwitchedList,cDlm,entry(i + 1,pcTableRenames),entry(i,pcTableRenames)).
-                cDlm = ",".
-            end.     
-            TableRenames = cSwitchedList.
-        end.
-        else 
-            TableRenames = pcTableRenames.
+        RenameIsfirstEntry = plRenameisFirstEntry.
     end constructor.
     
-    constructor public QueryRenameTableQualifiers (pcTableRenames as character):  
+    constructor public QueryRenameTableQualifiers ( ):  
         super ().
-        TableRenames = pcTableRenames.
+    
     end constructor.
     
     method override public void Traverse( input pTableRequest as IGetDataTableRequest):

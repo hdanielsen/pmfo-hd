@@ -21,4 +21,6 @@ interface Pmfo.Core.BusinessLogic.IRelationDefinition :
     /* the resource nameo on the other end */
     define public property PublicName     as character no-undo get.   
     define public property Cardinality     as RelationTypeEnum no-undo get. set.
+    define public property XRef            as logical no-undo get. set.
+    
 end interface.

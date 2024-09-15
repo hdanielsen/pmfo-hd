@@ -1,13 +1,13 @@
  
- /*------------------------------------------------------------------------
-    File        : DataSource
-    Purpose     : 
-    Syntax      : 
-    Description : 
-    Author(s)   : hdaniels
-    Created     : Wed Feb 13 10:20:47 EST 2019
-    Notes       : 
-  ----------------------------------------------------------------------*/
+/*------------------------------------------------------------------------
+   File        : DataSource
+   Purpose     : 
+   Syntax      : 
+   Description : 
+   Author(s)   : hdaniels
+   Created     : Wed Feb 13 10:20:47 EST 2019
+   Notes       : 
+ ----------------------------------------------------------------------*/
  
 block-level on error undo, throw.
 
@@ -82,6 +82,10 @@ using Progress.Reflect.Method from propath.
 using Pmfo.Core.DataLayer.Update.SourceFieldManager from propath.
 using Pmfo.Core.DataLayer.ISourceField from propath.
 using Pmfo.Core.DataLayer.Util.SaveUtil from propath.
+using Pmfo.Core.Common.IKey from propath.
+using Pmfo.Core.Common.IFieldValue from propath.
+using Pmfo.Core.Common.FieldValue from propath.
+using Pmfo.Core.Common.Key from propath.
  
 
 class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdateTarget:
@@ -125,9 +129,9 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
     
     define public property FillErrors     as ICollection no-undo 
         get():
-           if not valid-object(FillErrors) then
-               FillErrors = new Collection().  
-           return FillErrors.         
+            if not valid-object(FillErrors) then
+                FillErrors = new Collection().  
+            return FillErrors.         
         end.
         private set.
      
@@ -168,11 +172,11 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
             do:
                 AssertBufferHandles("Get UpdateSource").
                 do i = 1 to extent(BufferHandles):
-                   if BufferHandle = BufferHandles[i] then
-                   do:
-                       UpdateSource = i.
-                       leave.
-                   end.    
+                    if BufferHandle = BufferHandles[i] then
+                    do:
+                        UpdateSource = i.
+                        leave.
+                    end.    
                 end.    
             end.
             return UpdateSource.
@@ -225,19 +229,19 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
             define variable rRowid          as rowid     no-undo.
             if NextRowKey = "" or NextRowKey = ? then 
             do:
-               do iSource = 1 to extent(BufferHandles):
-                   if BufferHandle = BufferHandles[iSource] then 
-                       leave.
-               end.  
-               if not valid-handle(DataSourcehandle) then 
-                   return ?. // Added after removing create datasource from the setter since it caused memory leak on save (report execute)
+                do iSource = 1 to extent(BufferHandles):
+                    if BufferHandle = BufferHandles[iSource] then 
+                        leave.
+                end.  
+                if not valid-handle(DataSourcehandle) then 
+                    return ?. // Added after removing create datasource from the setter since it caused memory leak on save (report execute)
                              //  TODO can this ever happen    
-               hSource = DataSourcehandle:get-source-buffer (iSource).
-               rRowid = DataSourcehandle:next-rowid(iSource).
+                hSource = DataSourcehandle:get-source-buffer (iSource).
+                rRowid = DataSourcehandle:next-rowid(iSource).
                // assumed to be because we're not paging 
-               if rRowid = ? then 
-                   return ?.
-               NextRowKey =  GetNextRowKey(hSource, rRowid).     
+                if rRowid = ? then 
+                    return ?.
+                NextRowKey =  GetNextRowKey(hSource, rRowid).     
             end.
             return NextRowKey.
         end.     
@@ -269,6 +273,12 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         return GetBufferHandles().
     end method.
     
+    // allow subclasses to customize alreayd exists error - default to replace db table with GetRowname the 
+    method protected character GetPublicAlreadyExistsMessage(pcMessage as character,phBeforebuffer as handle, piSource as integer):
+        return replace(pcMessage,BufferHandles[piSource]:name,BufferUtil:GetRowName(phBeforeBuffer)).
+    end method.
+    
+    
     method protected character GetDataSourceKeys ( pDatasourcebuffer as handle ):
         return pDatasourcebuffer:keys.
     end method.
@@ -278,7 +288,7 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
     end method.
     
     method protected IHandleDataSourceMap GetDataSourceMap(phHandle as handle):
-        return cast(cast(Application:ServiceManager,IServiceManager):getService(get-class(IHandleDataSourceMap), new LifecycleScope(phHandle)),IHandleDataSourceMap). 
+        return cast(cast(Ccs.Common.Application:ServiceManager,IServiceManager):getService(get-class(IHandleDataSourceMap), new LifecycleScope(phHandle)),IHandleDataSourceMap). 
     end.    
     
     /* DataAccess subscribes this to the Beforeupdate event fired before the update starts
@@ -393,7 +403,7 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
     
     method protected handle GetAndAssertErrorBuffer():
         if DataBuffer:before-buffer:avail and DataBuffer:before-buffer:row-state = row-deleted then
-             return DataBuffer:before-buffer.
+            return DataBuffer:before-buffer.
         else if DataBuffer:Avail = false then
         do:
             undo, throw new IllegalOperationError(subst("Error in error handling: Buffer '&1' is not available",DataBuffer:name)).
@@ -445,11 +455,11 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                     if valid-handle(hFld) then 
                     do: 
                         ckeymap = cKeymap 
-                               + (if cKeyMap = "" then "" else ",")
-                               + subst("&1,&2.&1",entry(i,ckeys),BufferHandles[i]:name).  
+                            + (if cKeyMap = "" then "" else ",")
+                            + subst("&1,&2.&1",entry(i,ckeys),BufferHandles[i]:name).  
                         cExceptList = cExceptList 
-                                    + (if cExceptList = "" then "" else ",")
-                                    + entry(i,ckeys).  
+                            + (if cExceptList = "" then "" else ",")
+                            + entry(i,ckeys).  
                                                             
                     end. 
                 end.
@@ -510,15 +520,15 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                 if oAction:CompareFields > "" then
                 do:
                     do i = 1 to num-entries(oAction:CompareFields): 
-                       hFld = DataBuffer:buffer-field(entry(i,oAction:CompareFields)) no-error.
-                       if not valid-handle(hFld) then 
-                       do:
+                        hFld = DataBuffer:buffer-field(entry(i,oAction:CompareFields)) no-error.
+                        if not valid-handle(hFld) then 
+                        do:
                            
-                           undo, throw new IllegalStateError(subst("Action '&1' CompareFields entry '&2' does not exist in '&3'",
-                                                                    oAction:name,
-                                                                    entry(i,oAction:CompareFields),
-                                                                    BufferUtil:GetRowName(Databuffer))).
-                       end.        
+                            undo, throw new IllegalStateError(subst("Action '&1' CompareFields entry '&2' does not exist in '&3'",
+                                oAction:name,
+                                entry(i,oAction:CompareFields),
+                                BufferUtil:GetRowName(Databuffer))).
+                        end.        
                     
                     end.
                 end.    
@@ -550,19 +560,19 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         
         if pcFieldMap > "" and pcExceptList > "" then
         do i = 1 to num-entries(pcExceptList) :
-           cfield = entry(i,pcExceptList).
-           if cField > "" then
-           do:
-               iLookup = lookup(cField,pcfieldMap).
-               if iLookup > 0 then 
-               do:
+            cfield = entry(i,pcExceptList).
+            if cField > "" then
+            do:
+                iLookup = lookup(cField,pcfieldMap).
+                if iLookup > 0 then 
+                do:
                    // remvoe both entries
-                   pcfieldMap = StringUtil:RemoveEntryFromList(iLookup, pcFieldMap) .
+                    pcfieldMap = StringUtil:RemoveEntryFromList(iLookup, pcFieldMap) .
                    // should be the same ewntry since we rmeoved one before
-                   pcfieldMap = StringUtil:RemoveEntryFromList(iLookup, pcFieldMap) .
+                    pcfieldMap = StringUtil:RemoveEntryFromList(iLookup, pcFieldMap) .
                    
-               end.
-           end.
+                end.
+            end.
         end.     
         return pcFieldMap.
     end method.    
@@ -572,6 +582,8 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         define variable i             as integer no-undo.
         define variable cHiddenFields as character no-undo.
         define variable cExcept       as character no-undo.
+        define variable iJoinField    as integer no-undo.
+        define variable lKeepattached as logical no-undo.
         if extent(BufferHandles) = ? or not valid-handle(BufferHandles[1])  then
             undo, throw new IllegalOperationError("CreateSaveSource in DataSource with no database buffers").
         if valid-object(DataSourcehandle) then
@@ -587,7 +599,6 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         
         pcFieldMap = TrimSaveFieldMap(pcFieldMap, pcExceptlist).
         
-        phBuffer:attach-data-source(DataSourceHandle,pcFieldMap,pcExceptList).
         cHiddenFields = BufferUtil:GetHiddenFields(phBuffer).
         do i = 1 to num-entries(pcExceptList): 
             cExcept = entry(i,pcExceptlist).
@@ -597,14 +608,24 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         if lookup(BufferUtil:SeqFieldName,cHiddenFields) > 0 then 
             cHiddenFields = StringUtil:RemoveEntryFromList(BufferUtil:SeqFieldName,cHiddenFields).
          
+        phBuffer:attach-data-source(DataSourceHandle,pcFieldMap,pcExceptList).
         if cHiddenfields > "" then  
         do: 
+           
+             // DEFECT OCTA-39132 
+             // - Case #:  01028213 - work around -
+            // was decided to not be a bug, but it is quite problematic when having hidden fields
             // need to set both to supress the reset of before values 
             // for unchanged hidden fields different than db  
             // used in SaveRow
+            // This requires logic in saverow to apply the current value to the afte table
+            // if there are no changes - otherwise the value, which will be set from default
+            // and not from client for hidden fields will be saved and override the data  
             DataSourceHandle:merge-by-field = false.
             DataSourceHandle:prefer-dataset = true.
-        end.    
+           
+        end.
+                
     end method.
     
     // allow subclass to override 
@@ -615,11 +636,11 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
     method protected void DefineFieldProxies():
         
     end method.   
-      /**
-       The concrete classes will typically override PrepareSave(buffer) to Bind the table as follows 
-         htable  = phbuffer:table-handle
-         Bind(input table-handle hTable).
-    **/       
+    /**
+     The concrete classes will typically override PrepareSave(buffer) to Bind the table as follows 
+       htable  = phbuffer:table-handle
+       Bind(input table-handle hTable).
+  **/       
     method final public logical PrepareSave( phBuffer as handle,pUpdateRequest as IUpdateDataRequest ):
         
          
@@ -634,9 +655,13 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         // that set ProxyFieldNames used in CreateSaveSource - TODO - move all proxies to  DefineFieldProxies().
   
         PrepareSaveBuffer(phBuffer).   
+        
             
         if valid-object (ProxyManager) then 
             ProxyManager:Prepare(Databuffer, BufferHandle).
+        
+        if type-of(pUpdateRequest,Pmfo.Core.BusinessLogic.IUpdateDataRequest) then 
+             PostPrepareSave(input phBuffer, cast(pUpdateRequest,Pmfo.Core.BusinessLogic.IUpdateDataRequest)).
         
         CreateSaveSource(phBuffer,FieldMap,PrepareAndGetSaveExceptList(phBuffer,pUpdateRequest)).
         
@@ -650,6 +675,10 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                 PrepareCustomRequest(pUpdateRequest:CustomRequest).
         end.    
     end method. 
+     
+     // override in subcclass for example to call UpdateKeys to chang keys before child sources are started
+    method protected void PostPrepareSave(phBuffer as handle,pUpdateRequest as Pmfo.Core.BusinessLogic.IUpdateDataRequest ):
+    end.     
      
     method protected IFieldProxy SetFieldProxy(phfld as handle,phDbBuffer as handle, pcDbfieldName as character):
         return AddFieldProxy(new FieldProxy(phFld,phDbBuffer,pcDbfieldName)).
@@ -686,7 +715,7 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
     end method.     
     
     method protected IConstantField DefineConstantField(pcDBFieldname as character, plValue as logical):
-         if valid-handle(BufferHandle) then 
+        if valid-handle(BufferHandle) then 
             return DefineConstantField(BufferHandle,pcDbFieldname,plValue).
         else
             undo , throw new IllegalOperationError("DefineConstantField(DbFieldname,Value) called before BufferHandle is prepared").     
@@ -752,10 +781,11 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
     end method.
      
     // called from refreshBuffer - in order to use mapping and after row when refreshing data 
-    method public logical PrepareCurrent(phBuffer as handle, pParentRequest as IGetDataTableRequest).
+    method public IGetDataTableRequest PrepareCurrent(phBuffer as handle, pParentRequest as IGetDataTableRequest).
         define variable oTableRequest as Pmfo.Core.BusinessLogic.IGetDataTableRequest no-undo.
         oTableRequest = GetFindCurrentRowRequest(phBuffer).
-        return Prepare(phBuffer,oTableRequest,pParentRequest).
+        Prepare(phBuffer,oTableRequest,pParentRequest).
+        return oTableRequest.
     end method.
     
     method final public logical PrePrepare(phBuffer as handle, pRequest as IGetDataTableRequest).
@@ -773,8 +803,8 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
             if valid-handle(phTopBuffer) = false or phBuffer:parent-relation:parent-buffer <> phTopBuffer then
                 cNames = GetParentNames(phBuffer:parent-relation:parent-buffer,phTopBuffer).
             cNames = cNames 
-                   + (if cNames > "" then "," else "")
-                   + phBuffer:parent-relation:parent-buffer:name.
+                + (if cNames > "" then "," else "")
+                + phBuffer:parent-relation:parent-buffer:name.
                  
         end.   
         return cNames.
@@ -830,42 +860,43 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         define variable iLastinnerJoinMainTable    as integer no-undo.
         define variable iBuffer                    as integer no-undo.
         define variable cJoinToChildAsParent       as character no-undo.
-        define variable iSource as integer no-undo. 
-        
+        define variable iSource                    as integer no-undo. 
+        define variable oProxyManager              as ProxyManager no-undo.
+      
         oDataSourceMap = GetDataSourceMap(phdataset).
      
         oHandles = new Collection().
       
         // referenced table parents must be included - this ensures the list is ordered 
         // with parents first 
+        
         do iTempTable = 1 to num-entries(pcInnerJoinTables):
             hBuffer = phDataset:get-buffer-handle(entry(iTempTable,pcInnerJoinTables)).
             cOtherTables = GetParentNames(hBuffer,DataBuffer).
             do iParentTable = 1 to num-entries(cOtherTables):
                 cBufferName = entry(iParentTable,cOtherTables). 
                 if cBufferName <> Databuffer:name 
-                and lookup(cBufferName,cAllJoinedTables) = 0 then
-                   cAllJoinedTables = cAllJoinedTables
-                              + (if cAllJoinedTables > "" then "," else "") 
-                              + cBufferName.
+                    and lookup(cBufferName,cAllJoinedTables) = 0 then
+                    cAllJoinedTables = cAllJoinedTables
+                        + (if cAllJoinedTables > "" then "," else "") 
+                        + cBufferName.
                                
             end.
             if lookup(hBuffer:name,cAllJoinedTables) = 0 then
                 cAllJoinedTables = cAllJoinedTables
-                           + (if cAllJoinedTables > "" then "," else "") 
-                           + hBuffer:name.
+                    + (if cAllJoinedTables > "" then "," else "") 
+                    + hBuffer:name.
         end.
         
         oTableBufferMap = new StringStringMap(). 
         
         if valid-object(pParentRequest) then
         do: 
-           extent(hTempTablebuffers) = num-entries(cAllJoinedTables) + 1.
-           hTempTableBuffers[1] = Databuffer.
-           do iTempTable = 1 to num-entries(cAllJoinedTables):
-               hTempTableBuffers[iTempTable + 1] = phdataset:get-buffer-handle(entry(iTemptable,cAllJoinedTables)).
-           end.    
-         
+            extent(hTempTablebuffers) = num-entries(cAllJoinedTables) + 1.
+            hTempTableBuffers[1] = Databuffer.
+            do iTempTable = 1 to num-entries(cAllJoinedTables):
+                hTempTableBuffers[iTempTable + 1] = phdataset:get-buffer-handle(entry(iTemptable,cAllJoinedTables)).
+            end.    
         end. 
         else 
             hTempTableBuffers = OrderBuffersForInnerJoin(cast(pRequest,Pmfo.Core.BusinessLogic.IGetDataTableRequest), cAllJoinedTables, phDataset).
@@ -881,6 +912,7 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                 extent(cTableQueries) = ?.
                 cTableQueries = QueryUtil:SplitQuery(oDataSources[iTempTable]:QueryStringWithoutParent).
                 cRenameList = "".
+                iRename  = 0.
                 do iDbBuffer = 1 to extent(cTableQueries):
                     cBuffername = "".
                     cAddQuery = "". 
@@ -902,23 +934,23 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                         cAddQuery = cTableQueries[iDbBuffer].
                         cBufferName = oDataSources[iTempTable]:BufferHandles[iDbBuffer]:name.
                     end.
-                    
+                     
                     if cBufferName > "" then 
                     do:
                         if iDBBuffer > 1 and cRenameList > "" then 
                         do:
                             // subsequent tables is likely to have joins to the table that was renamed
                             do iRenameEntry = 1 to num-entries(cRenameList) by 2.
-                               cAddQuery = QueryUtil:ReplaceTableName(cAddQuery, entry(iRenameentry,cRenameList), entry(iRenameentry + 1,cRenameList)).
+                                cAddQuery = QueryUtil:ReplaceTableName(cAddQuery, entry(iRenameentry,cRenameList), entry(iRenameentry + 1,cRenameList)).
                             end.    
                         end.    
                         cName = cBufferName.
-/*                        if lookup(cName,BufferNames) > 0 then*/
-/*                        do:                                  */
-/*                                                             */
-/*                                                             */
-/*                                                             */
-/*                        end.                                 */
+                        /*                        if lookup(cName,BufferNames) > 0 then*/
+                        /*                        do:                                  */
+                        /*                                                             */
+                        /*                                                             */
+                        /*                                                             */
+                        /*                        end.                                 */
                         
                         do while lookup(cName,BufferNames) > 0 or lookup(cName,cNewNames) > 0:
                             iRename = iRename + 1.
@@ -928,10 +960,10 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                         do:
                             cAddQuery = QueryUtil:ReplaceTableName(cAddQuery, cBufferName, cName).
                             cRenameList = cRenameList 
-                                        + (if cRenameList = "" then "" else ",")
-                                        + cBufferName 
-                                        + ","
-                                        + cName.   
+                                + (if cRenameList = "" then "" else ",")
+                                + cBufferName 
+                                + ","
+                                + cName.   
                             
                         end.
                          
@@ -954,7 +986,6 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                 do:
                     if not valid-object(oTableBufferRenameMap) then 
                         oTableBufferRenameMap = new StringStringMap().
-                        
                     oTableBufferRenameMap:put(hTempTablebuffers[iTempTable]:name,cRenameList).
                 end.  
             end.
@@ -966,7 +997,7 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                 bufferhandleloop:
                 do iBufferHandle = 1 to extent(BufferHandles):
                     if BufferHandles[iBufferHandle] = BufferHandle then
-                       lMainbufferAdded  = true.
+                        lMainbufferAdded  = true.
                     else if lMainbufferAdded then 
                     do:
                         // if pouter join then set iStartMainOuterJoinTables to use as start when adding these at end
@@ -1000,16 +1031,16 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                             // Whenever encountered the best fix is likely to ensure GetBufferHandles only moves bufferhandles when 
                             // there is no inner join pRequest:GetInnerJoins() = ""    
                             undo, throw new UnsupportedOperationError
-                                        (subst("The '&1' Entity Buffers and BaseQuery is run-time optimized to define '&2' as the first database buffer instead of the main '&3' database buffer."
-                                               + " This may conflict with the runtime optimization for the inner join for the expanded tables that has moved database buffer '&4' from the '&5' entity as the first buffer in the inner join query."
-                                               + " The Data Source does not support changes to both the default BaseQuery order and the default expand query order. Please Contact IT.",
-                                               entityname,
-                                               entry(1,BufferNames),
-                                               BufferName,
-                                               oDataSources[1]:BufferHandles[1]:name,
-                                               oDataSources[1]:entityname
-                                              )
-                                        ).
+                                (subst("The '&1' Entity Buffers and BaseQuery is run-time optimized to define '&2' as the first database buffer instead of the main '&3' database buffer."
+                                + " This may conflict with the runtime optimization for the inner join for the expanded tables that has moved database buffer '&4' from the '&5' entity as the first buffer in the inner join query."
+                                + " The Data Source does not support changes to both the default BaseQuery order and the default expand query order. Please Contact IT.",
+                                entityname,
+                                entry(1,BufferNames),
+                                BufferName,
+                                oDataSources[1]:BufferHandles[1]:name,
+                                oDataSources[1]:entityname
+                                )
+                                ).
                     end.
                     // iLastinnerJoinMainTable is less than extent(Bufferhqandles) if we need to skip outerjoin tables here (will beadded afcter this)     
                     do iBuffer = 1 to iLastinnerJoinMainTable:
@@ -1034,12 +1065,10 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         // add any outer joins found at end
         if iStartMainOuterJoinTables > 0 then
         do: 
-            
             do iBufferHandle = iStartMainOuterJoinTables to extent(BufferHandles):
                 oHandles:Add(new WidgetHandle(BufferHandles[iBufferHandle])).
                 cInnerJoinQuery =  left-trim(subst("&1, &2",cInnerJoinQuery,cMainBaseQueries[iBufferHandle])).   
             end.
-         
         end.
     
         lMainJoinAdded =  hTempTablebuffers[1] = DataBuffer.
@@ -1054,16 +1083,16 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                 if cJoinToChildAsParent > "" then 
                 do:  
                     cInnerJoinQuery = QueryUtil:InsertQueryExpression(
-                                          BufferHandles[1]:Name,
-                                          cInnerJoinQuery, 
-                                          cJoinToChildAsParent).
+                        BufferHandles[1]:Name,
+                        cInnerJoinQuery, 
+                        cJoinToChildAsParent).
                     
                 end.    
                 else do:
                     relationloop:
                     do iRelation = 1 to Databuffer:num-child-relations:
                         do iJoinTable = 1 to ITempTable - 1:
-                           
+                             
                             if DataBuffer:get-child-relation(iRelation):child-buffer = hTempTablebuffers[iJoinTable] then
                             do:
                                 hRelation = DataBuffer:get-child-relation(iRelation).
@@ -1076,11 +1105,11 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                     if lChildIsParent then 
                     do:
                         cNewWhere = GetInnerJoinExpression(oDataSourceMap,hRelation, oTableBufferMap,true).
-                      
+                        
                         cInnerJoinQuery = QueryUtil:InsertQueryExpression(
-                                          BufferName,
-                                          cInnerJoinQuery, 
-                                          cNewWhere).
+                            BufferName,
+                            cInnerJoinQuery, 
+                            cNewWhere).
             
                     end.   
                 end.
@@ -1096,9 +1125,9 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                         do:
                             cNewWhere = GetInnerJoinExpression(oDataSourceMap,hRelation, oTableBufferMap,true).
                             cInnerJoinQuery = QueryUtil:InsertQueryExpression(
-                                              string(oTableBufferMap:Get(hTempTableBuffers[iTemptable]:name)),
-                                              cInnerJoinQuery, 
-                                              cNewWhere).
+                                string(oTableBufferMap:Get(hTempTableBuffers[iTemptable]:name)),
+                                cInnerJoinQuery, 
+                                cNewWhere).
                             leave relationloop.                  
                         end.               
                     end.                     
@@ -1108,15 +1137,15 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                     cNewWhere = GetInnerJoinExpression(oDataSourceMap,hRelation, oTableBufferMap,false).
          
                     cInnerJoinQuery = QueryUtil:InsertQueryExpression(
-                                         string(oTableBufferMap:Get(hTempTableBuffers[iTemptable]:name)),
+                        string(oTableBufferMap:Get(hTempTableBuffers[iTemptable]:name)),
                                         
-                                         cInnerJoinQuery, 
-                                         cNewWhere).
+                        cInnerJoinQuery, 
+                        cNewWhere).
                 end.  
                                        
             end.
         end.   
-        
+         
         // recreate the main datasource properties like BufferHandles, QueryHandle, DataSourcehnadle and 
         // attach the Databuffer  datasource 
         extent(hNewHandles) = oHandles:size.
@@ -1124,12 +1153,13 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         iDbbuffer = 0.
         do while oIterator:HasNext(): 
             iDbBuffer = iDbBuffer + 1.
-            hNewHandles[iDbBuffer] = cast(oIterator:Next(),WidgetHandle):value. 
+            hNewHandles[iDbBuffer] = cast(oIterator:Next(),WidgetHandle):value.
         end.    
         extent(BufferHandles) = ?.
         BufferHandles = hNewHandles.
+                                                  
         CreateQuery().
-       
+         
         DataBuffer:attach-data-source(DataSourceHandle,FieldMap).
         
         do iSource = 1 to extent(oDataSources):
@@ -1163,9 +1193,10 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
             cInnerJoinQuery = subst("&1 &2",cInnerJoinQuery,trim(cRecordPhrase)).
             
         if valid-object(pParentRequest) then    
-            cInnerJoinQuery = AddParentJoinToQuery(cInnerJoinQuery).     
+            cInnerJoinQuery = AddParentJoinToQuery(cInnerJoinQuery).   
+         
         QueryHandle:query-prepare(cInnerJoinQuery).
- 
+        
         return true. 
     end method.
     
@@ -1174,20 +1205,20 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
     end method.     
     
     method public void CompareQueries(phbuffer as handle, pcQuery as character):
-/*        message                                         */
-/*          "buffer name"                                 */
-/*                                                        */
-/*        phbuffer:name "buffer table" phBuffer:table skip*/
-/*        pcQuery skip                                    */
-/*                                                        */
-/*         "entity" entityname  skip                      */
-/*        "basequery" GetBaseQuery()  skip                */
-/*                                                        */
-/*        //skip posource:GetBaseQuery()                  */
-/*                                                        */
-/*                                                        */
-/*        view-as alert-box.                              */
-/*                                                        */
+    /*        message                                         */
+    /*          "buffer name"                                 */
+    /*                                                        */
+    /*        phbuffer:name "buffer table" phBuffer:table skip*/
+    /*        pcQuery skip                                    */
+    /*                                                        */
+    /*         "entity" entityname  skip                      */
+    /*        "basequery" GetBaseQuery()  skip                */
+    /*                                                        */
+    /*        //skip posource:GetBaseQuery()                  */
+    /*                                                        */
+    /*                                                        */
+    /*        view-as alert-box.                              */
+    /*                                                        */
         
     end method.     
     
@@ -1246,12 +1277,12 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         return HasUniqueIndexFieldsForFirstTable(pcFieldList,false).     
     end.    
      
-     /* check if a field list has referecces to all componenets of a unique index in the first buffer in the query
-        @Params - pcFieldList - list of temp-table fields from the IGetDataTableRequest - typically GetPredicateFieldEqualMatches
-                pcQualifier - specifies the qualifier used for the field when applicable 
-                             - for innerjoins this would be the temp-table name in the requested dataset
+    /* check if a field list has referecces to all componenets of a unique index in the first buffer in the query
+       @Params - pcFieldList - list of temp-table fields from the IGetDataTableRequest - typically GetPredicateFieldEqualMatches
+               pcQualifier - specifies the qualifier used for the field when applicable 
+                            - for innerjoins this would be the temp-table name in the requested dataset
                              
-     */   
+    */   
     method public logical HasUniqueIndexFieldsForFirstTable(pcFieldList as character, plUseQualifier as logical) :
         define variable cUniqueIndexFields as character extent no-undo.
         define variable i as integer no-undo.
@@ -1292,7 +1323,7 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                 end.        
             end.
             if lFound then 
-               return true.     
+                return true.     
         end.                 
         return false.
     end.  
@@ -1343,7 +1374,7 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
     // fields to use to check if this source's buffer shuld be first in the inner join 
     // allow subclasses to override (typcially to ignore some fields that does not provide a reasn to add this buffer first in the join
     method protected character GetPreferredRangeMatchesForInnerJoin(pRequest as Pmfo.Core.BusinessLogic.IGetDataTableRequest):
-         return pRequest:GetPredicateFieldRangeMatches().
+        return pRequest:GetPredicateFieldRangeMatches().
     end method.
     
     method protected handle GetFirstBufferForInnerJoin(pRequest as Pmfo.Core.BusinessLogic.IGetDataTableRequest, pJoinTables as character, phDataset as handle):
@@ -1387,8 +1418,8 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
             cField = entry(i,cPredicateRangeMatches).
             if lookup(cField,cMatches) = 0 then 
                 cMatches = cMatches 
-                         + (if cMatches = "" then "" else ",")
-                         + cField.   
+                    + (if cMatches = "" then "" else ",")
+                    + cField.   
         end.
         
         if cMatches > "" then 
@@ -1467,13 +1498,13 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                 entry(1,cChildDbField,".") = cChildBuffername.
             if plParentIsChild then 
                 cExpression = cExpression 
-                            + (if cExpression = "" then "" else " and ")
-                            + subst("&1 = &2",cParentDbField,cChildDbField). 
+                    + (if cExpression = "" then "" else " and ")
+                    + subst("&1 = &2",cParentDbField,cChildDbField). 
            
             else
                 cExpression = cExpression 
-                            + (if cExpression = "" then "" else " and ")
-                            + subst("&1 = &2",cChildDbField,cParentDbField) . 
+                    + (if cExpression = "" then "" else " and ")
+                    + subst("&1 = &2",cChildDbField,cParentDbField) . 
                         
         end. 
         return cExpression.
@@ -1598,22 +1629,22 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
             DataBuffer:set-callback("before-fill","BeforeFillWithPaging").
             if valid-object(oRequest:QueryDefinition) then 
             do:
-               if extent(oRequest:QueryDefinition:QuerySort) <> ? then            
-                   DataSort = QueryUtil:GetQuerySortAsString(oRequest:QueryDefinition:QuerySort). 
+                if extent(oRequest:QueryDefinition:QuerySort) <> ? then            
+                    DataSort = QueryUtil:GetQuerySortAsString(oRequest:QueryDefinition:QuerySort). 
             end.       
         end. 
         
         CreateQuery().   
-        
+      
         if ProxyFieldNames > "" and valid-object(pParentRequest) then
         do:   
             cChildJoinFields = BufferUtil:GetChildJoinFields(DataBuffer:parent-relation).     
             do iFld =  1 to num-entries(cChildJoinFields): 
-               if lookup(entry(iFld,cChildJoinFields),ProxyFieldNames) > 0 then 
-               do: 
-                  lProxyJoin = true.
-                  leave.   
-               end.    
+                if lookup(entry(iFld,cChildJoinFields),ProxyFieldNames) > 0 then 
+                do: 
+                    lProxyJoin = true.
+                    leave.   
+                end.    
             end.    
         end.
         
@@ -1631,13 +1662,13 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         else do: 
          
             DataBuffer:attach-data-source(DataSourceHandle,FieldMap).
-            /** Cannot do this here since we need to build the query to support child filter in innerjoin
-            if valid-object(pParentRequest) then
-            do:
-                QueryStringWithoutParent = cQuery. // used by prepareInnerJoins
-                cQuery = AddParentJoinToQuery(cQuery).
-            end.     
-            **/
+        /** Cannot do this here since we need to build the query to support child filter in innerjoin
+        if valid-object(pParentRequest) then
+        do:
+            QueryStringWithoutParent = cQuery. // used by prepareInnerJoins
+            cQuery = AddParentJoinToQuery(cQuery).
+        end.     
+        **/
         end.
                 
         if plSkipQueryPrepare = false and valid-object(pRequest:QueryDefinition) then
@@ -1656,8 +1687,8 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
             catch e as Progress.Lang.Error :
               
                // default to throw but overrides may ignore - and just return false to silently set no-fill
-               HandleQueryError(pRequest,e).
-               return false. 
+                HandleQueryError(pRequest,e).
+                return false. 
             end catch.
         end.
         else if not lProxyJoin then
@@ -1670,13 +1701,13 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         end.
         
         if  pRequest:NumRecords = 0 
-        and pRequest:PagingContext = ""
-        and pRequest:Skip = 0 then
+            and pRequest:PagingContext = ""
+            and pRequest:Skip = 0 then
         do:
             iIndexedPosition = StringUtil:FindAnyWord(cQuery,"indexed-reposition").
             if iIndexedPosition > 0 then 
                // remove 1 extra since there is space before and after
-               substring(cQuery,iIndexedPosition,length("indexed-reposition") + 1) = "".
+                substring(cQuery,iIndexedPosition,length("indexed-reposition") + 1) = "".
         
             QueryHandle:forward-only = true.
         end.
@@ -1697,9 +1728,9 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         end.
         if plSkipQueryPrepare = false then
         do:          
-/*            if entityname= "partners" then*/
-/*                message cQuery            */
-/*                view-as alert-box.        */
+            /*            if entityname= "partners" then*/
+            /*                message cQuery            */
+            /*                view-as alert-box.        */
             lok = QueryHandle:query-prepare(cQuery).
             
             // workaround for recursive data source fill-where-string and query prepare-string not being in sync
@@ -1722,7 +1753,6 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         else 
             lok = true. // not sure what is best here ???    
      
-         
         RecordCounter = 0. 
         return lok. 
         catch e as Progress.Lang.Error :
@@ -1730,9 +1760,9 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
             //  (ideally this error should never happen in production... but it will 
             if e:GetMessageNum(1) = 7328  or e:GetMessageNum(1) = 7325 or e:GetMessageNum(1) = 247 then
             do:
-               oAppError = new ApplicationError("The query does not compile.",e). 
-               oAppError:AddMessage(cQuery,?).
-               undo, throw oAppError.
+                oAppError = new ApplicationError("The query does not compile.",e). 
+                oAppError:AddMessage(cQuery,?).
+                undo, throw oAppError.
             end.    
             undo, throw e.
         end catch.   
@@ -1749,11 +1779,11 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         do: 
             //  count if manual query is not implemented yet   
             if UseBeforeFillWithPaging then 
-               undo, throw new NotImplementedError(subst("Count of many to one query of '&1'",Entityname)).
+                undo, throw new NotImplementedError(subst("Count of many to one query of '&1'",Entityname)).
                    
             if valid-object(pRequest:QueryDefinition) 
-            and extent(pRequest:QueryDefinition:QuerySort) > 0 
-            and plHasParent = false then
+                and extent(pRequest:QueryDefinition:QuerySort) > 0 
+                and plHasParent = false then
             do:
                 cCountQuery = trim(pcQuery).
                 entry(1,cCountQuery,StringConstant:SPACE) = "preselect".
@@ -1844,13 +1874,13 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                     end.
                     else do:
                         cNextRowKey = cNextRowKey 
-                                    + (if cNextRowKey = "" then "" else " and ")
-                                    + subst("&1 eq &2",
-                                            if ExternalPaging 
-                                            then DataBuffer:buffer-field(cTTField):serialize-name
-                                            else cTtField,
-                                            cNextValue
-                                          ).
+                            + (if cNextRowKey = "" then "" else " and ")
+                            + subst("&1 eq &2",
+                            if ExternalPaging 
+                            then DataBuffer:buffer-field(cTTField):serialize-name
+                            else cTtField,
+                            cNextValue
+                            ).
                     end.                           
                 end.     
             end.
@@ -1917,14 +1947,14 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         return rids.
         catch e as Progress.Lang.Error :
             if e:GetMessageNum(1) =  247 then 
-                 cErrorDetails = subst("' - &1'",cQuery).
+                cErrorDetails = subst("' - &1'",cQuery).
             undo, throw new NotFoundError(subst("'&1' with paging context &2 &3",
-                                                if pRequest:ExternalPaging then DataBuffer:serialize-name else DataBuffer:table-handle:name,
-                                                pRequest:PagingContextEntry:ToString(),
-                                                cErrorDetails 
-                                                ),
-                                          e      
-                                          ).          
+                if pRequest:ExternalPaging then DataBuffer:serialize-name else DataBuffer:table-handle:name,
+                pRequest:PagingContextEntry:ToString(),
+                cErrorDetails 
+                ),
+                e      
+                ).          
         end catch.
     end method.    
     
@@ -1966,13 +1996,98 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                             next exceptloop.
                     end.    
                     pcExceptList[j] = pcExceptList[j]
-                                    + (if pcExceptList[j] = "" then "" else ",") 
-                                    + cTtField.
+                        + (if pcExceptList[j] = "" then "" else ",") 
+                        + cTtField.
                 end.                                     
             end.     
         end. 
-       
     end.    
+    
+    method protected void UpdateKey(phBuffer as handle, poNewKey as IKey ):
+        define variable iInputKey     as integer no-undo.
+        define variable iChild        as integer no-undo.
+        
+        define variable iField        as integer no-undo.
+        define variable cParentField  as character no-undo.
+        define variable hRelation     as handle  no-undo.
+        define variable cParentFields as character no-undo.
+        define variable iKeyField     as integer no-undo.
+        define variable hQuery        as handle no-undo.
+        define variable oChildkey     as IKey no-undo.
+        define variable cJoin         as character no-undo.
+        define variable oFieldValues  as IFieldValue extent no-undo.
+        define variable iKey          as integer no-undo.
+        define variable cChildName    as character no-undo.
+        define variable cParentJoins  as character no-undo.
+        define variable cChildJoins   as character no-undo.
+        define variable lHaskey       as logical no-undo.
+        define variable iKeyPos       as integer no-undo.
+        define variable hField        as handle no-undo.
+        define variable lAny          as logical no-undo.
+        do iInputKey = 1 to extent(poNewKey:FieldValues): 
+            hField = phBuffer:buffer-field(poNewKey:FieldValues[iInputKey]:name) no-error.
+            if valid-handle(hField) then
+                lany = true.
+             
+        end.
+        if not lAny then 
+            undo, throw new IllegalArgumentError(subst("UpdateKey called for buffer &1 with no fields that matches Key  &2",
+                                                       phBuffer:name,
+                                                       poNewKey:toString() 
+                                                       )
+                                                 ).
+        
+        do iChild = 1 to phBuffer:num-child-relations: 
+            hRelation = phBuffer:get-child-relation(iChild).
+            cParentFields = BufferUtil:GetParentJoinFields(hRelation).
+            cJoin = BufferUtil:GetJoinExpression(hRelation).
+            cParentJoins = BufferUtil:GetParentJoinFields(hRelation).
+            cChildJoins  = BufferUtil:GetChildJoinFields(hRelation).
+            
+            extent(oFieldValues) = ?.
+            extent(oFieldValues) = extent(poNewKey:FieldValues).
+            lHaskey = false.
+            do iKey = 1 to extent(oFieldValues): 
+                iKeypos = lookup(poNewKey:FieldValues[iKey]:Name,cParentJoins). 
+                if iKeyPos > 0 then 
+                do:
+                    oFieldValues[iKey] = new FieldValue(entry(iKeypos,cChildJoins),poNewKey:FieldValues[iKey]:Value).
+                    lHaskey = true.
+                end.
+            end.
+            if lHaskey then 
+            do on error undo, throw: 
+                oChildkey = new Key(ofieldValues).
+                create query hQuery.
+                hQuery:add-buffer(hRelation:child-buffer).
+                hQuery:query-prepare(subst("preselect each &1 where &3 and row-state(&1) = &2",
+                                            hRelation:child-buffer:name,
+                                            row-created,
+                                            cJoin)).
+         
+                hQuery:query-open().
+                hQuery:get-first.
+                do while hRelation:child-buffer:avail:
+                    if hRelation:child-buffer:rejected = false and hRelation:child-buffer:error = false then
+                    do: 
+                        UpdateKey(hRelation:child-buffer,oChildkey).    
+                    end.     
+                    hQuery:get-next. 
+                end. 
+                finally:
+                    if valid-handle(hQuery) then 
+                        delete object hQuery.        
+                end finally.
+            end.
+        end.  
+        do iInputKey = 1 to extent(poNewKey:FieldValues): 
+            hField = phBuffer:buffer-field(poNewKey:FieldValues[iInputKey]:name) no-error.
+            if valid-handle(hField) then
+            do:
+                hField:buffer-value = poNewKey:FieldValues[iInputKey]:value:toString().
+            end.
+        end.       
+    end method.
     
     method public logical FillRow(phBuffer as handle):
         return valid-object(FillRow(phBuffer,?)).
@@ -1998,8 +2113,8 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
             // typically ensure all values are redresehed on save - i.e. call RowAfter and a add an empty override of RefillCurrentRow 
             // See ProcessControlGuideImageDS 
             undo, throw new IllegalStateError(subst("RefillCurrentRow called in DataSource with &1 set to true. Please Contact IT.",
-                                                     if NoConnectNeeded then "NoConnectNeeded" else "NoQueryCreate")
-                                              ).
+                if NoConnectNeeded then "NoConnectNeeded" else "NoQueryCreate")
+                ).
         QueryHandle:query-open().  
         QueryHandle:get-first(). 
         hds = DataBuffer:dataset.
@@ -2066,7 +2181,7 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         return CompareBufferWithDb(phBuffer,"",output hdummy1, output hDummy2). 
     end method.
     
-     method protected character CompareBufferWithDb(phBuffer as handle, pcFields as character):
+    method protected character CompareBufferWithDb(phBuffer as handle, pcFields as character):
         define variable hDummy1 as handle extent no-undo.
         define variable hDummy2 as handle extent no-undo.
         
@@ -2104,19 +2219,19 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         SplitFieldMap(FieldMap, output cFieldMaps,output cExceptLists).        
         cHiddenFields = BufferUtil:GetHiddenFields(phBuffer).
         if NoLobs then 
-           cLobs = GetLobFields().  
+            cLobs = GetLobFields().  
         
         do i = 1 to extent(BufferHandles):
             if BufferHandle = BufferHandles[i] then
             do: 
-                 cExceptLists[i] = trim(cExceptLists[i] + "," + cHiddenFields,",").
+                cExceptLists[i] = trim(cExceptLists[i] + "," + cHiddenFields,",").
                 if NoLobs and cLobs > "" then 
                 do iLob = 1 to num-entries(cLobs): 
                     cLobField = entry(iLob,cLobs).
                     if lookup(cLobField,cExceptLists[i]) = 0 then
                         cExceptLists[i] = cExceptLists[i] 
-                                        + (if cExceptLists[i] = "" then "" else ",") 
-                                        + cLobField.
+                            + (if cExceptLists[i] = "" then "" else ",") 
+                            + cLobField.
                 end.
                      
                 if phBuffer:buffer-compare(BufferHandle,"case-sensitive",? ,cFieldMaps[i]) = false then
@@ -2141,7 +2256,7 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                                 extent(phSourceFields) = ?
                                 phDataFields   = Array:mergeArrays(hDataFieldsWork, hDataFields)
                                 phSourceFields = Array:mergeArrays(hSourceFieldsWork, hSourceFields)
-                               .
+                                .
                         end.
                         else 
                             assign                        
@@ -2158,27 +2273,27 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
             cProxyChanges = ProxyManager:CheckRow(this-object,phbuffer).
             if cProxyChanges > "" then 
             do:
-/*                if cChanges > "" and extent(hDataFields) > 1 then                                   */
-/*                do:                                                                                 */
-/*                        if extent(phdatafields) > 1 then                                            */
-/*                        do:                                                                         */
-/*                            assign                                                                  */
-/*                                extent(hDataFieldsWork) = ?                                         */
-/*                                extent(hSourceFieldsWork) = ?                                       */
-/*                                hDataFieldsWork = phDataFields                                      */
-/*                                hSourcefieldswork = phSourceFields                                  */
-/*                                extent(phDataFields) = ?                                            */
-/*                                extent(phSourceFields) = ?                                          */
-/*                                phDataFields   = Array:mergeArrays(hDataFieldsWork, hDataFields)    */
-/*                                phSourceFields = Array:mergeArrays(hSourceFieldsWork, hSourceFields)*/
-/*                               .                                                                    */
-/*                        end.                                                                        */
-/*                        else                                                                        */
-/*                            assign                                                                  */
-/*                                phDataFields = hDatafields                                          */
-/*                                phSourceFields = hSourcefields                                      */
-/*                                .                                                                   */
-/*                    end.                                                                            */
+                /*                if cChanges > "" and extent(hDataFields) > 1 then                                   */
+                /*                do:                                                                                 */
+                /*                        if extent(phdatafields) > 1 then                                            */
+                /*                        do:                                                                         */
+                /*                            assign                                                                  */
+                /*                                extent(hDataFieldsWork) = ?                                         */
+                /*                                extent(hSourceFieldsWork) = ?                                       */
+                /*                                hDataFieldsWork = phDataFields                                      */
+                /*                                hSourcefieldswork = phSourceFields                                  */
+                /*                                extent(phDataFields) = ?                                            */
+                /*                                extent(phSourceFields) = ?                                          */
+                /*                                phDataFields   = Array:mergeArrays(hDataFieldsWork, hDataFields)    */
+                /*                                phSourceFields = Array:mergeArrays(hSourceFieldsWork, hSourceFields)*/
+                /*                               .                                                                    */
+                /*                        end.                                                                        */
+                /*                        else                                                                        */
+                /*                            assign                                                                  */
+                /*                                phDataFields = hDatafields                                          */
+                /*                                phSourceFields = hSourcefields                                      */
+                /*                                .                                                                   */
+                /*                    end.                                                                            */
                 
                 cChanges = left-trim(subst("&1,&2",cChanges,cProxyChanges),",").
             end.     
@@ -2201,9 +2316,9 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         do i = 1 to DataBuffer:num-fields:
             hFld = Databuffer:buffer-field(i).
             if hFld:data-type = "BLOB" or hFld:data-type = "CLOB" then 
-               cFields = cFields 
-                       + (if cFields = "" then "" else ",")
-                       + hFld:name. 
+                cFields = cFields 
+                    + (if cFields = "" then "" else ",")
+                    + hFld:name. 
         end.    
         return cFields.
         
@@ -2230,19 +2345,19 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
             hQuery:get-first.
            
             do while true:
-               i = i + 1.
-               if RestartRow > 0 then 
-                   Databuffer:buffer-delete().
+                i = i + 1.
+                if RestartRow > 0 and DataBuffer:avail then
+                    Databuffer:buffer-delete().
                
-               if i < RestartRow - 1 then 
-                   hQuery:get-next.               
-               else do: 
+                if i < RestartRow - 1 then 
+                    hQuery:get-next.               
+                else do: 
                    //.if Count = false then
-                   leave.
+                    leave.
                       
                  //  Databuffer:buffer-delete().
                 
-               end.       
+                end.       
             end.   
             if Count then NumRecords = i.   
         end.  
@@ -2296,24 +2411,24 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
            // if lSkip = false then
             do on error undo, throw:
                 DataBuffer:buffer-create().
-/*                if iStartRow = 0 and extent(pStartIds) <> ?  then*/
-/*                   lFoundStart = true.                           */
-/*                                                                 */
+                /*                if iStartRow = 0 and extent(pStartIds) <> ?  then*/
+                /*                   lFoundStart = true.                           */
+                /*                                                                 */
                 do i = 1 to  QueryHandle:num-buffers:
                     if QueryHandle:get-buffer-handle(i):avail then
                     do:
                         DataBuffer:buffer-copy(QueryHandle:get-buffer-handle(i),cExceptLists[i],cFieldMaps[i]).
-/*                        if lFoundStart = true                                          */
-/*                        and extent(pStartIds) <> ?                                     */
-/*                        and pStartIds[i] <> QueryHandle:get-buffer-handle(i):rowid then*/
-/*                           lFoundStart = false.                                        */
+                    /*                        if lFoundStart = true                                          */
+                    /*                        and extent(pStartIds) <> ?                                     */
+                    /*                        and pStartIds[i] <> QueryHandle:get-buffer-handle(i):rowid then*/
+                    /*                           lFoundStart = false.                                        */
                        
                     end.    
                 end.
                 AfterRow(dataset-handle hds by-reference).
                 
-/*                if lFoundStart then           */
-/*                    iStartRow = RecordCounter.*/
+                /*                if lFoundStart then           */
+                /*                    iStartRow = RecordCounter.*/
                 
                 do iChild = 1 to Databuffer:num-child-relations:
                     hChild = DataBuffer:get-child-relation (iChild):child-buffer .
@@ -2322,10 +2437,7 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                  
                 if pagesize > 0 then 
                 do: 
-                    if (extent(pStartIds) = ?  and RecordCounter > pageSize) 
-//                        or
-  //                     (extent(pStartIds) <> ? and iStartRow > 0 and RecordCounter > pageSize + iStartROw)
-                    then 
+                    if (extent(pStartIds) = ?  and RecordCounter > pageSize) then 
                     do: 
                         NextRowKey = GetNextRowKey(BufferHandle, BufferHandle:rowid).
                         DataBuffer:buffer-delete.
@@ -2426,8 +2538,8 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
             cChildbuffer = entry(1,cChildField,"."). 
             cParentField = entry(2,cFieldExp,"=").
             cNewWhere    = cNewWhere 
-                         + cAnd 
-                         + cChildField + " eq " + cParentField.
+                + cAnd 
+                + cChildField + " eq " + cParentField.
             cAnd         = " and ".               
         end. 
         if cChildbuffer <> BufferName and lookup(cChildbuffer,BufferNames) > 0 then
@@ -2442,6 +2554,9 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
        */ 
     method public void DatasetTransactionEnd( input dataset-handle phDataset ).
     end method. 
+    
+    method protected void BeginTransactionValidate(input dataset-handle phDataset):
+    end method.   
     
     method protected void CreatePreTransValidate(input dataset-handle phDataset):
     end method.   
@@ -2488,14 +2603,14 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
     // optimisic locking support woth check sum (from Steve Southwell)
     method protected character GetRecordChecksum(
         input bh as handle
-    ):
+        ):
         
         define variable vraw as raw no-undo.
         define variable fh as handle no-undo.
         define variable hbtt as handle no-undo.
         
         if true then
-        undo, throw new NotImplementedError().
+            undo, throw new NotImplementedError().
         
         if not bh:available then undo, throw new Progress.Lang.AppError("Buffer is not available for checksum",-1).
         
@@ -2558,12 +2673,12 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         case pEventType:
             when ValidationHookEventType:Begin 
             or when ValidationHookEventType:Pre then
-               undo, throw new IllegalOperationError(subst("'&1' validation hook event type is not supported for Actions",caps(pEventType:ToString()))).
+                undo, throw new IllegalOperationError(subst("'&1' validation hook event type is not supported for Actions",caps(pEventType:ToString()))).
             
             when ValidationHookEventType:End then
 
                 ActionEndTransValidate(pAction,input dataset-handle hDataset by-reference).
-             when ValidationHookEventType:Post then
+            when ValidationHookEventType:Post then
                 ActionPostTransValidate(pAction,input dataset-handle hDataset by-reference).    
         end case.   
     end method.    
@@ -2583,146 +2698,147 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         
         case pEventType:
             when ValidationHookEventType:Begin then
-            case phBeforeBuffer:row-state:
-                when row-deleted then
-                    DeleteBeginTransValidate(input dataset-handle hDataset by-reference).
-                when row-modified then
-                    WriteBeginTransValidate(input dataset-handle hDataset by-reference).
-                when row-created then
-                do:
-                    CreateBeginTransValidate(input dataset-handle hDataset by-reference).
-                    WriteBeginTransValidate(input dataset-handle hDataset by-reference).
-                end.
-            end. // phBeforeBuffer:row-state 
+                case phBeforeBuffer:row-state:
+                    when row-deleted then
+                        DeleteBeginTransValidate(input dataset-handle hDataset by-reference).
+                    when row-modified then
+                        WriteBeginTransValidate(input dataset-handle hDataset by-reference).
+                    when row-created then
+                        do:
+                            CreateBeginTransValidate(input dataset-handle hDataset by-reference).
+                            WriteBeginTransValidate(input dataset-handle hDataset by-reference).
+                        end.
+                end. // phBeforeBuffer:row-state 
             when ValidationHookEventType:End then
-            case phBeforeBuffer:row-state:
-                when row-deleted then
-                    DeleteEndTransValidate(input dataset-handle hDataset by-reference).
-                when row-modified then
-                    WriteEndTransValidate(input dataset-handle hDataset by-reference).
-                when row-created then
-                do:
-                    CreateEndTransValidate(input dataset-handle hDataset by-reference).
-                    WriteEndTransValidate(input dataset-handle hDataset by-reference).
-                end.
-            end. // phBeforeBuffer:row-state  
+                case phBeforeBuffer:row-state:
+                    when row-deleted then
+                        DeleteEndTransValidate(input dataset-handle hDataset by-reference).
+                    when row-modified then
+                        WriteEndTransValidate(input dataset-handle hDataset by-reference).
+                    when row-created then
+                        do:
+                            CreateEndTransValidate(input dataset-handle hDataset by-reference).
+                            WriteEndTransValidate(input dataset-handle hDataset by-reference).
+                        end.
+                end. // phBeforeBuffer:row-state  
             when ValidationHookEventType:Pre then
-            case phBeforeBuffer:row-state:
-                when row-deleted then
-                    DeletePreTransValidate(input dataset-handle hDataset by-reference).
-                when row-modified then
-                    WritePreTransValidate(input dataset-handle hDataset by-reference).
-                when row-created then
-                do:
-                    CreatePreTransValidate(input dataset-handle hDataset by-reference).
-                    WritePreTransValidate(input dataset-handle hDataset by-reference).
-                end.
-            end.  // phBeforeBuffer:row-state 
+                case phBeforeBuffer:row-state:
+                    when row-deleted then
+                        DeletePreTransValidate(input dataset-handle hDataset by-reference).
+                    when row-modified then
+                        WritePreTransValidate(input dataset-handle hDataset by-reference).
+                    when row-created then
+                        do:
+                            CreatePreTransValidate(input dataset-handle hDataset by-reference).
+                            WritePreTransValidate(input dataset-handle hDataset by-reference).
+                        end.
+                end.  // phBeforeBuffer:row-state 
             when ValidationHookEventType:Post then
-            case phBeforeBuffer:row-state:
-                when row-deleted then
-                    DeletePostTransValidate(input dataset-handle hDataset by-reference).
-                when row-modified then
-                    WritePostTransValidate(input dataset-handle hDataset by-reference).
-                when row-created then
-                do:
-                    CreatePostTransValidate(input dataset-handle hDataset by-reference).
-                    WritePostTransValidate(input dataset-handle hDataset by-reference).
-                end.
-            end case. // phBeforeBuffer:row-state    
+                case phBeforeBuffer:row-state:
+                    when row-deleted then
+                        DeletePostTransValidate(input dataset-handle hDataset by-reference).
+                    when row-modified then
+                        WritePostTransValidate(input dataset-handle hDataset by-reference).
+                    when row-created then
+                        do:
+                            CreatePostTransValidate(input dataset-handle hDataset by-reference).
+                            WritePostTransValidate(input dataset-handle hDataset by-reference).
+                        end.
+                end case. // phBeforeBuffer:row-state    
         end case. // pEventType   
             
     end method.
    // 10/16/2023 -  remove after a minth if no problems having CreateSaveSource setting prefer-datset if hidden fields 
-/*    // Workaround for DEFECT OCTA-39312 - Case #:  01028213                                                                                                                           */
-/*    method private logical SaveRowFixBeforebufferBug(phBeforeBuffer as handle):                                                                                                       */
-/*        define variable hAfter as handle no-undo.                                                                                                                                     */
-/*        define variable hBackupBuffer as handle no-undo.                                                                                                                              */
-/*        define variable rRowid as rowid no-undo.                                                                                                                                      */
-/*        define variable lok as logical no-undo.                                                                                                                                       */
-/*        define variable cHiddenFields as character no-undo.                                                                                                                           */
-/*        if phBeforeBuffer:row-state <> row-modified then                                                                                                                              */
-/*             undo, throw new IllegalArgumentError("SaveRowFixBeforebufferBug called with row-state other than modified") .                                                            */
-/*                                                                                                                                                                                      */
-/*        hAfter = phBeforeBuffer:after-buffer.                                                                                                                                         */
-/*        if valid-handle(BackupDataset) then                                                                                                                                           */
-/*        do on error undo, throw:                                                                                                                                                      */
-/*            hBackupBuffer = BackupDataset:get-buffer-handle(hAfter:name).                                                                                                             */
-/*                                                                                                                                                                                      */
-/*            hBackupBuffer:find-unique () no-error.                                                                                                                                    */
-/*            if not hBackupbuffer:avail then                                                                                                                                           */
-/*            do:                                                                                                                                                                       */
-/*                hBackupBuffer:buffer-create.                                                                                                                                          */
-/*            end.                                                                                                                                                                      */
-/*            hBackupbuffer:buffer-copy(phBeforebuffer).                                                                                                                                */
-/*            hBackUpbuffer:table-handle:tracking-changes = true.                                                                                                                       */
-/*            hBackupbuffer:buffer-copy(hAfter).                                                                                                                                        */
-/*            hBackUpbuffer:table-handle:tracking-changes = false.                                                                                                                      */
-/*            catch e as Progress.Lang.Error :                                                                                                                                          */
-/*                undo, throw new ApplicationError(subst("Error in pre processing of &1 in workaround for bad before buffer after save. Please Contact IT.",                            */
-/*                                                        BufferUtil:GetRowName(hAfter)),                                                                                               */
-/*                                                      e).                                                                                                                             */
-/*            end catch.                                                                                                                                                                */
-/*        end.                                                                                                                                                                          */
-/*                                                                                                                                                                                      */
-/*        lok = phBeforeBuffer:save-row-changes(1,"",NoLobs).                                                                                                                           */
-/*                                                                                                                                                                                      */
-/*        if lok                                                                                                                                                                        */
-/*        // data source modified with no-error means save is successful,                                                                                                               */
-/*        // but ALL (not only one) before values are lost and reset from the db because there were differences with db in a field that                                                 */
-/*        // was not saved becuase after and before was the same                                                                                                                        */
-/*        and phBeforeBuffer:data-source-modified                                                                                                                                       */
-/*        and valid-handle(BackupDataset)                                                                                                                                               */
-/*        and hBackupbuffer:before-rowid <> ?                                                                                                                                           */
-/*        and phBeforeBuffer:data-source-modified                                                                                                                                       */
-/*        then                                                                                                                                                                          */
-/*        do on error undo, throw:                                                                                                                                                      */
-/*            hAfter:find-by-rowid(phBeforeBuffer:after-rowid).                                                                                                                         */
-/*                                                                                                                                                                                      */
-/*            rRowid = hAfter:rowid.                                                                                                                                                    */
-/*                                                                                                                                                                                      */
-/*            do on error undo, throw:                                                                                                                                                  */
-/*                phBeforeBuffer:reject-row-changes.                                                                                                                                    */
-/*                catch e as Progress.Lang.Error :                                                                                                                                      */
-/*                    cHiddenFields = BufferUtil:GetHiddenFields(hAfter).                                                                                                               */
-/*                    if cHiddenFields > "" then                                                                                                                                        */
-/*                       BufferUtil:GetFieldLabels(hAfter, cHiddenFields) .                                                                                                             */
-/*                                                                                                                                                                                      */
-/*                    undo, throw new ApplicationError(                                                                                                                                 */
-/*                       subst("Repply of &1 changes during post processing of workaround for bad before buffers &2 caused a conflict with other submitted records. Please Contact IT.",*/
-/*                                BufferUtil:GetRowName(hAfter),                                                                                                                        */
-/*                                if cHiddenFields > "" then subst(" likely due to hidden fields: &1, ",cHiddenFields) else ""                                                          */
-/*                            ),                                                                                                                                                        */
-/*                       e).                                                                                                                                                            */
-/*                end catch.                                                                                                                                                            */
-/*            end.                                                                                                                                                                      */
-/*            hAfter:find-by-rowid(rRowid).                                                                                                                                             */
-/*            hBackupbuffer:before-buffer:find-by-rowid (hBackupbuffer:before-rowid).                                                                                                   */
-/*            hAfter:buffer-copy(hBackupbuffer:before-buffer).                                                                                                                          */
-/*            hAfter:table-handle:tracking-changes = true.                                                                                                                              */
-/*            hAfter:buffer-copy(hBackupbuffer).                                                                                                                                        */
-/*            hAfter:table-handle:tracking-changes = false.                                                                                                                             */
-/*            phBeforebuffer:find-by-rowid(hAfter:before-rowid).                                                                                                                        */
-/*            hBackupbuffer:before-buffer:reject-row-changes.                                                                                                                           */
-/*            catch e1 as ApplicationError :                                                                                                                                            */
-/*                undo, throw e1.                                                                                                                                                       */
-/*            end.                                                                                                                                                                      */
-/*            catch e2 as Progress.Lang.Error :                                                                                                                                         */
-/*                undo, throw new ApplicationError(subst("Error in post processing of &1 in workaround for bad before buffer after save. Please Contact IT.",                           */
-/*                                                       BufferUtil:GetRowName(hAfter)),                                                                                                */
-/*                                                 e2).                                                                                                                                 */
-/*            end catch.                                                                                                                                                                */
-/*                                                                                                                                                                                      */
-/*        end.                                                                                                                                                                          */
-/*                                                                                                                                                                                      */
-/*        return lok.                                                                                                                                                                   */
-/*    end method.                                                                                                                                                                       */
+    /*    // Workaround for DEFECT OCTA-39312 - Case #:  01028213                                                                                                                           */
+    /*    method private logical SaveRowFixBeforebufferBug(phBeforeBuffer as handle):                                                                                                       */
+    /*        define variable hAfter as handle no-undo.                                                                                                                                     */
+    /*        define variable hBackupBuffer as handle no-undo.                                                                                                                              */
+    /*        define variable rRowid as rowid no-undo.                                                                                                                                      */
+    /*        define variable lok as logical no-undo.                                                                                                                                       */
+    /*        define variable cHiddenFields as character no-undo.                                                                                                                           */
+    /*        if phBeforeBuffer:row-state <> row-modified then                                                                                                                              */
+    /*             undo, throw new IllegalArgumentError("SaveRowFixBeforebufferBug called with row-state other than modified") .                                                            */
+    /*                                                                                                                                                                                      */
+    /*        hAfter = phBeforeBuffer:after-buffer.                                                                                                                                         */
+    /*        if valid-handle(BackupDataset) then                                                                                                                                           */
+    /*        do on error undo, throw:                                                                                                                                                      */
+    /*            hBackupBuffer = BackupDataset:get-buffer-handle(hAfter:name).                                                                                                             */
+    /*                                                                                                                                                                                      */
+    /*            hBackupBuffer:find-unique () no-error.                                                                                                                                    */
+    /*            if not hBackupbuffer:avail then                                                                                                                                           */
+    /*            do:                                                                                                                                                                       */
+    /*                hBackupBuffer:buffer-create.                                                                                                                                          */
+    /*            end.                                                                                                                                                                      */
+    /*            hBackupbuffer:buffer-copy(phBeforebuffer).                                                                                                                                */
+    /*            hBackUpbuffer:table-handle:tracking-changes = true.                                                                                                                       */
+    /*            hBackupbuffer:buffer-copy(hAfter).                                                                                                                                        */
+    /*            hBackUpbuffer:table-handle:tracking-changes = false.                                                                                                                      */
+    /*            catch e as Progress.Lang.Error :                                                                                                                                          */
+    /*                undo, throw new ApplicationError(subst("Error in pre processing of &1 in workaround for bad before buffer after save. Please Contact IT.",                            */
+    /*                                                        BufferUtil:GetRowName(hAfter)),                                                                                               */
+    /*                                                      e).                                                                                                                             */
+    /*            end catch.                                                                                                                                                                */
+    /*        end.                                                                                                                                                                          */
+    /*                                                                                                                                                                                      */
+    /*        lok = phBeforeBuffer:save-row-changes(1,"",NoLobs).                                                                                                                           */
+    /*                                                                                                                                                                                      */
+    /*        if lok                                                                                                                                                                        */
+    /*        // data source modified with no-error means save is successful,                                                                                                               */
+    /*        // but ALL (not only one) before values are lost and reset from the db because there were differences with db in a field that                                                 */
+    /*        // was not saved becuase after and before was the same                                                                                                                        */
+    /*        and phBeforeBuffer:data-source-modified                                                                                                                                       */
+    /*        and valid-handle(BackupDataset)                                                                                                                                               */
+    /*        and hBackupbuffer:before-rowid <> ?                                                                                                                                           */
+    /*        and phBeforeBuffer:data-source-modified                                                                                                                                       */
+    /*        then                                                                                                                                                                          */
+    /*        do on error undo, throw:                                                                                                                                                      */
+    /*            hAfter:find-by-rowid(phBeforeBuffer:after-rowid).                                                                                                                         */
+    /*                                                                                                                                                                                      */
+    /*            rRowid = hAfter:rowid.                                                                                                                                                    */
+    /*                                                                                                                                                                                      */
+    /*            do on error undo, throw:                                                                                                                                                  */
+    /*                phBeforeBuffer:reject-row-changes.                                                                                                                                    */
+    /*                catch e as Progress.Lang.Error :                                                                                                                                      */
+    /*                    cHiddenFields = BufferUtil:GetHiddenFields(hAfter).                                                                                                               */
+    /*                    if cHiddenFields > "" then                                                                                                                                        */
+    /*                       BufferUtil:GetFieldLabels(hAfter, cHiddenFields) .                                                                                                             */
+    /*                                                                                                                                                                                      */
+    /*                    undo, throw new ApplicationError(                                                                                                                                 */
+    /*                       subst("Repply of &1 changes during post processing of workaround for bad before buffers &2 caused a conflict with other submitted records. Please Contact IT.",*/
+    /*                                BufferUtil:GetRowName(hAfter),                                                                                                                        */
+    /*                                if cHiddenFields > "" then subst(" likely due to hidden fields: &1, ",cHiddenFields) else ""                                                          */
+    /*                            ),                                                                                                                                                        */
+    /*                       e).                                                                                                                                                            */
+    /*                end catch.                                                                                                                                                            */
+    /*            end.                                                                                                                                                                      */
+    /*            hAfter:find-by-rowid(rRowid).                                                                                                                                             */
+    /*            hBackupbuffer:before-buffer:find-by-rowid (hBackupbuffer:before-rowid).                                                                                                   */
+    /*            hAfter:buffer-copy(hBackupbuffer:before-buffer).                                                                                                                          */
+    /*            hAfter:table-handle:tracking-changes = true.                                                                                                                              */
+    /*            hAfter:buffer-copy(hBackupbuffer).                                                                                                                                        */
+    /*            hAfter:table-handle:tracking-changes = false.                                                                                                                             */
+    /*            phBeforebuffer:find-by-rowid(hAfter:before-rowid).                                                                                                                        */
+    /*            hBackupbuffer:before-buffer:reject-row-changes.                                                                                                                           */
+    /*            catch e1 as ApplicationError :                                                                                                                                            */
+    /*                undo, throw e1.                                                                                                                                                       */
+    /*            end.                                                                                                                                                                      */
+    /*            catch e2 as Progress.Lang.Error :                                                                                                                                         */
+    /*                undo, throw new ApplicationError(subst("Error in post processing of &1 in workaround for bad before buffer after save. Please Contact IT.",                           */
+    /*                                                       BufferUtil:GetRowName(hAfter)),                                                                                                */
+    /*                                                 e2).                                                                                                                                 */
+    /*            end catch.                                                                                                                                                                */
+    /*                                                                                                                                                                                      */
+    /*        end.                                                                                                                                                                          */
+    /*                                                                                                                                                                                      */
+    /*        return lok.                                                                                                                                                                   */
+    /*    end method.                                                                                                                                                                       */
     
     method public logical SaveRow(phBeforeBuffer as handle):
         define variable lOk as logical no-undo.
         define variable cAllChanges as character no-undo.
         define variable cChanges as character no-undo.
         define variable oSaveUtil as SaveUtil no-undo. 
+       
         // save-row-changes for delete will optimistic lock check every field
         // FindAndCompareSource ignores the serialize-hidden fields
         if phBeforeBuffer:row-state = row-deleted then
@@ -2739,13 +2855,13 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                 do:
                     cChanges = FieldSaveManager:CheckRow(this-object,phBeforeBuffer).
                     if cChanges > "" then 
-                       cAllChanges = StringUtil:AppendEntry(cAllChanges, cChanges).
+                        cAllChanges = StringUtil:AppendEntry(cAllChanges, cChanges).
                 end.    
                 if valid-object(ProxyManager) then
                 do:
                     cChanges = ProxyManager:CheckRow(this-object,phBeforeBuffer).
                     if cChanges > "" then 
-                       cAllChanges = StringUtil:AppendEntry(cAllChanges, cChanges).
+                        cAllChanges = StringUtil:AppendEntry(cAllChanges, cChanges).
                 end.
                 
                 if valid-object(ProxyManager) and ProxyManager:HasKey then
@@ -2753,7 +2869,7 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                     oSaveUtil = new SaveUtil().
                     cChanges = oSaveUtil:CheckRow(this-object,phBeforeBuffer).
                     if cChanges > "" then 
-                       cAllChanges = StringUtil:AppendEntry(cAllChanges, cChanges).
+                        cAllChanges = StringUtil:AppendEntry(cAllChanges, cChanges).
                     
                     if cAllChanges > "" then 
                         undo, throw new ConflictError(phBeforeBuffer,BufferUtil:GetFieldLabels(Databuffer,cAllChanges)).
@@ -2773,31 +2889,49 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                     // changed to documentation bug...
                     // so we need a workaround, and call FindAndCompareSource to check for changes since these settings
                     // supresses optimistic lock from save-row-changes    
-                    if DataSourceHandle:prefer-dataset and DataSourceHandle:merge-by-field = false then 
+                    if DataSourceHandle:prefer-dataset and DataSourceHandle:merge-by-field = false then
+                    do: 
                         FindAndCompareSource(phBeforeBuffer).
-                        
-                    lok = phBeforeBuffer:save-row-changes(1,"",NoLobs).             
+                        // save-row-changes will update all values, so hiddenfields witrh no changes
+                        // will get the default value
+                        // - so if the before and after is the same set after from the DB 
+                        //   so that it does not overwrite                        
+                        ApplyHiddenFieldsValuesFromDB(phBeforebuffer,BufferHandle).
+                    end.    
+                    lok = phBeforeBuffer:save-row-changes(1,"",NoLobs). 
                 end. 
             end.
             else do: // create
+                if valid-object(SourceFieldManager) then
+                do: 
+                    // checkrow in sourcefieldmanager is hijacked for prepare for create
+                    // (the manager is only used for crease and do need optitic lock check) 
+                    // This is an otptional step typcially used if a constant proxy 
+                    //  need to access a buffer to get current last value
+                    SourceFieldManager:CheckRow(this-object,phBeforeBuffer).
+                end.
+                
                 // use SaveUtil if key is managed by manager since 
                 // The source is not avail after save-row-changes and the managers wont be able to find the new record if key is not assigned
                 // so the field mangers are thus expecting a creatred record to be available 
                 if (valid-object(SourceFieldManager) and SourceFieldManager:HasKey) 
-                or (valid-object(ProxyManager) and (ProxyManager:HasKey or ProxyManager:HasMandatoryInitNull)) 
-                or (valid-object(FieldSaveManager) and (FieldSaveManager:HasKey or FieldSaveManager:HasMandatoryInitNull)) then
+                    or (valid-object(ProxyManager) and (ProxyManager:HasKey or ProxyManager:HasMandatoryInitNull)) 
+                    or (valid-object(FieldSaveManager) and (FieldSaveManager:HasKey or FieldSaveManager:HasMandatoryInitNull)) then
                 do:
                     oSaveUtil = new SaveUtil().
                     lok = oSaveUtil:SaveRow(this-object, phBeforeBuffer).
                 end.
                 else do:      
+                   
                     lok = phBeforeBuffer:save-row-changes(1,"",NoLobs).
-                    // very annoying behavior - the record is lost during save-row-changes  
+                    // annoying behavior - the record is lost during save-row-changes  
                     phBeforebuffer:after-buffer:find-by-rowid (phBeforebuffer:after-rowid).  
                     FindSource(exclusive-lock). 
                 end.   
                 if lok and valid-object(SourceFieldManager) then 
+                do:
                     SourceFieldManager:SaveRow(this-object, phBeforeBuffer).
+                end.    
             end.    
             if valid-object(FieldSaveManager) then
             do:
@@ -2815,6 +2949,54 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         end.
          
     end method.
+    
+    // hidden fields are not attached and prefer-dataset and DataSourceHandle:merge-by-field is set to true 
+    // to ensure before values are not overridden in save-row-changes 
+    // see comments in SaveRow  about-DataSourceHandle:prefer-dataset
+    // This method ensures that hdiden fields that actually have been changed in the BE are saved  
+    method private void ApplyHiddenFieldsValuesFromDB(phBeforeBuffer as handle, phDbSource as handle):
+        define variable cHiddenFields as character no-undo.
+        define variable i             as integer no-undo.
+        define variable hField        as handle no-undo.
+        define variable hBeforeField  as handle no-undo.
+        define variable cDbField      as character no-undo.
+        define variable hDbField      as handle no-undo.
+        define variable hBuffer       as handle no-undo.
+        define variable cField        as character no-undo.
+        define variable iArrayPos     as integer no-undo.
+        define variable iExtent       as integer no-undo.
+        // annoying behavior - the record is lost during save-row-changes  
+        hBuffer = phBeforebuffer:after-buffer. 
+        hBuffer:find-by-rowid (phBeforebuffer:after-rowid).  
+        cHiddenFields = BufferUtil:GetHiddenFields(hBuffer).
+                
+        do i = 1 to num-entries(cHiddenFields):
+            cField = entry(i,CHiddenFields). 
+            // skip the seqence - not really a problem since there will be no db field.. 
+            if cField <> BufferUtil:SeqFieldName then
+            do: 
+                hField       = hBuffer:buffer-field(entry(i,CHiddenFields)).
+                hBeforeField = phBeforebuffer:buffer-field(entry(i,CHiddenFields)).
+                if hField:buffer-value = hBeforeField:buffer-value then
+                do:  
+                    cDbField = StringUtil:GetMappedName(subst("&1.&2",hBuffer:name,hField:name),hBuffer:data-source-complete-map).
+                    if cDbField > "" and cDbField begins BufferHandle:name + "." then
+                    do:
+                        iArrayPos = index(cDbField,"[").  
+                        if iArrayPos > 0 then
+                        do:
+                            iExtent = integer(right-trim(substring(cDbField,iArrayPos + 1),"]")).
+                            cDbField = substring(cDbField,1,iArrayPos - 1).
+                        end.
+                        hDbfield = BufferHandle:buffer-field(entry(2,cDbField,".")) no-error.   
+                        if valid-handle(hDBField) then 
+                            hField:buffer-value = hDbField:buffer-value(IarrayPos).                             
+                    end.         
+                end.
+            end.  
+        end.    
+          
+    end method.    
     
     method public logical CustomOperation(pcObject as Object, phDataset as handle).
     end method.
@@ -2840,34 +3022,34 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
             pParameterList:SetParameter(pParameterList:NumParameters, "dataset-handle", "input by-reference", phDataset).
             oMethod = GetClass():GetMethod(pAction:Name,Progress.Reflect.Flags:Public or Progress.Reflect.Flags:Instance, pParameterList).
         end.
-/*        else if pAction:HasChild then                                                                            */
-/*        do:                                                                                                      */
-/*            oIterator = pAction:Children:Iterator().                                                             */
-/*            do while oIterator:HasNext():                                                                        */
-/*                oChildAction = cast(oIterator:Next(),IAction).                                                   */
-/*                oMethod = GetActionMethod(oChildAction,phDataset, output pParameterList).                        */
-/*                // return if valid (found in the child tree) or if we have found the right table return also if ?*/
-/*                if valid-object(oMethod) or oChildAction:TargetTableName = DataBuffer:table-handle:name then     */
-/*                    return oMethod.                                                                              */
-/*            end.                                                                                                 */
-/*        end.                                                                                                     */
+        /*        else if pAction:HasChild then                                                                            */
+        /*        do:                                                                                                      */
+        /*            oIterator = pAction:Children:Iterator().                                                             */
+        /*            do while oIterator:HasNext():                                                                        */
+        /*                oChildAction = cast(oIterator:Next(),IAction).                                                   */
+        /*                oMethod = GetActionMethod(oChildAction,phDataset, output pParameterList).                        */
+        /*                // return if valid (found in the child tree) or if we have found the right table return also if ?*/
+        /*                if valid-object(oMethod) or oChildAction:TargetTableName = DataBuffer:table-handle:name then     */
+        /*                    return oMethod.                                                                              */
+        /*            end.                                                                                                 */
+        /*        end.                                                                                                     */
         return oMethod.
     end method.
     
     method protected character GetRowState(input iRowState as integer):
-         define variable cRowState as character no-undo.
-         case iRowState:
-             when row-deleted then
-                 cRowState = "Delete".
-             when row-created then
-                 cRowState = "Create".
-             when row-modified then
-                 cRowState = "Update".
-             otherwise
-                 cRowState = "Unmodified".
-         end case.
+        define variable cRowState as character no-undo.
+        case iRowState:
+            when row-deleted then
+                cRowState = "Delete".
+            when row-created then
+                cRowState = "Create".
+            when row-modified then
+                cRowState = "Update".
+            otherwise
+            cRowState = "Unmodified".
+        end case.
          
-         return cRowState .
+        return cRowState .
     end method.   
     
     method protected character GetRowErrorMessage(pcMessage as char,piState as integer):
@@ -2906,9 +3088,9 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         return pPredicate. 
     end method.   
     
-   /** convert sort expression column for QueryString 
-      (second parse - column already transformed by ColumnSource(pccolumn)  
-      (part of IQueryMap interface used by QueryString to map query) */
+    /** convert sort expression column for QueryString 
+       (second parse - column already transformed by ColumnSource(pccolumn)  
+       (part of IQueryMap interface used by QueryString to map query) */
     method public IQuerySortEntry extent ColumnSort(pSort as IQuerySortEntry):
         define variable oSort      as IQuerySortEntry extent 1 no-undo.
         define variable oProxySort as IQuerySortEntry extent no-undo.
@@ -3116,7 +3298,7 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
           
             iLookup = lookup(cDBMapColumn,cMap).
             if iLookup > 0 then
-               cColumn = entry(iLookup - 1,cMap).
+                cColumn = entry(iLookup - 1,cMap).
                
         end.
         if iLookup = 0 then
@@ -3133,18 +3315,18 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         
         hBufferField = phbuffer:buffer-field(cColumn) no-error.
         if not valid-handle(hBufferField) then
-             undo, throw new IllegalArgumentError(subst("Database field '&1' is not mapped to DataSource &2",pcDbColumn,EntityName)).      
+            undo, throw new IllegalArgumentError(subst("Database field '&1' is not mapped to DataSource &2",pcDbColumn,EntityName)).      
         return HBufferField.
            
     end method.     
     
     method protected void FindSources(pLock as integer):
-         define variable hBeforebuffer as handle no-undo.
-         define variable i as integer no-undo.
-         hBeforebuffer = BufferUtil:AssertAndGetBeforebuffer(DataBuffer).
-         do i = 1 to extent(BufferHandles):
-             FindSource(hBeforebuffer,BufferHandles[i],pLock).
-         end.               
+        define variable hBeforebuffer as handle no-undo.
+        define variable i as integer no-undo.
+        hBeforebuffer = BufferUtil:AssertAndGetBeforebuffer(DataBuffer).
+        do i = 1 to extent(BufferHandles):
+            FindSource(hBeforebuffer,BufferHandles[i],pLock).
+        end.               
     end method.
     
     // void - throws error if not found
@@ -3152,98 +3334,111 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         FindSource(DataBuffer,BufferHandle,pLock). 
     end.    
     
+    method public void FindSource(phBuffer as handle, pLock as integer):
+         FindSource(phBuffer,BufferHandle,pLock). 
+    end method.
+     
     // void - throws error if not found
     method public void FindSource(phbuffer as handle,pDbBuffer as handle,plock as integer):
         define variable cWhere as character no-undo.
+        define variable oError as AppError     no-undo.
         cWhere = SourceWhere(phbuffer,pDbBuffer).
+        
         pDbBuffer:find-unique (cWhere,plock). 
         catch e as Progress.Lang.Error :
             if e:GetMessageNum(1) = 138 or e:GetMessageNum(1) = 3166 then
-                undo, throw new TableNotFoundError(phbuffer,GetFindCurrentRowRequest(phBuffer),e).
+            do: 
+                oError = new TableNotFoundError(phbuffer,GetFindCurrentRowRequest(phBuffer)).
+                oError:AddMessage(subst("Database query 'find &1 &2' throws error:~n&3",BufferName,cWhere,e:GetMessage(1)),?).  
+                undo, throw oError.
+            end.
             else 
                 undo, throw e.
         end catch.
     end.    
     
     method protected character SourceWhere(phbuffer as handle, phDbBuffer as handle):
-         define variable cDbKeys     as character no-undo.
-         define variable cDbKey      as character no-undo.
-         define variable cKey        as character no-undo.
-         define variable i           as integer no-undo.
-         define variable iSource     as integer no-undo.  
-         define variable cWhere      as character no-undo.
-         define variable cAnd        as character no-undo.
-         define variable hFld        as handle no-undo.
-         define variable cFieldWhere as character no-undo.
-         define variable cValue      as character no-undo.
-         define variable cErrorTmpl as character 
-             init  "Buffer '&1' is not a before or after buffer for the Data Buffer table '&2'"
-             no-undo.
-         if not phBuffer:avail then
-             undo, throw new IllegalStateError(subst("Buffer '&1' is not available",phBuffer:name)).
+        define variable cDbKeys     as character no-undo.
+        define variable cDbKey      as character no-undo.
+        define variable cKey        as character no-undo.
+        define variable i           as integer no-undo.
+        define variable iSource     as integer no-undo.  
+        define variable cWhere      as character no-undo.
+        define variable cAnd        as character no-undo.
+        define variable hFld        as handle no-undo.
+        define variable cFieldWhere as character no-undo.
+        define variable cValue      as character no-undo.
+        define variable lUseBefore  as logical no-undo.
+        define variable cErrorTmpl as character 
+            init  "Buffer '&1' is not a before or after buffer for the Data Buffer table '&2'"
+            no-undo.
+        if not phBuffer:avail then
+            undo, throw new IllegalStateError(subst("Buffer '&1' is not available",phBuffer:name)).
          
-         if valid-handle(phbuffer:after-buffer) then
-         do:  
-             if phBuffer:after-buffer:table-handle <> DataBuffer:table-handle then
-             do:
+        if valid-handle(phbuffer:after-buffer) then
+        do:  
+            if phBuffer:after-buffer:table-handle <> DataBuffer:table-handle then
+            do:
                 undo, throw new IllegalOperationError(subst(cErrorTmpl,phBuffer:name,DataBuffer:table-handle:name)).
-             end.
-         end.
-         else if phBuffer:table-handle <> DataBuffer:table-handle then
-             undo, throw new IllegalOperationError(subst(cErrorTmpl,phBuffer:name,DataBuffer:table-handle:name)).
-         
-         if valid-handle(phbuffer:after-buffer) and phBuffer:row-state = row-created then  
-             phBuffer = phbuffer:after-buffer.
+            end.
+            // use to decide how to get exprtression from proxy
+            lUseBefore = phBuffer:row-state <> row-created.
+        end.
+        else if phBuffer:table-handle <> DataBuffer:table-handle then
+            undo, throw new IllegalOperationError(subst(cErrorTmpl,phBuffer:name,DataBuffer:table-handle:name)).
           
-         cDbKeys = GetDataSourceKeys(phDbBuffer).
+        if valid-handle(phbuffer:after-buffer) and phBuffer:row-state = row-created then  
+            phBuffer = phbuffer:after-buffer.
+          
+        cDbKeys = GetDataSourceKeys(phDbBuffer).
          
-         cAnd = " where".
-         if cDbKeys = 'rowid' then 
-         do:
-             undo, throw new IllegalStateError(subst("Cannot find a unique record for class &1 because the database table key is rowid. A unique key consisting of field name(s) must be defined. This can be done in a GetDataSourceKeys override in the class.", this-object:GetClass():TypeName)).
-         end.    
+        cAnd = " where".
+        if cDbKeys = 'rowid' then 
+        do:
+            undo, throw new IllegalStateError(subst("Cannot find a unique record for class &1 because the database table key is rowid. A unique key consisting of field name(s) must be defined. This can be done in a GetDataSourceKeys override in the class.", this-object:GetClass():TypeName)).
+        end.    
          
-         do i = 1 to num-entries(cDbKeys):
-             assign
+        do i = 1 to num-entries(cDbKeys):
+            assign
                 cDbKey = subst("&1.&2",phDbBuffer:name,entry(i,cDbKeys))
                 cKey   = SourceColumn(cDbKey)
                 .
              // if the key is not mapped check if it is managed as a field object    
-             if cKey = "" then 
-             do: 
-                 if valid-object(SourceFieldManager) then
-                 do: 
+            if cKey = "" then 
+            do: 
+                if valid-object(SourceFieldManager) then
+                do: 
                      // will throw illegalState if a IHiddenSourceKey is reached here
                      // The error eill explain that a hidden source key must not be in GetfieldMap and not returned from GetDataSourceKeys 
-                     cFieldWhere  = SourceFieldManager:WhereExpression(phDbBuffer, entry(i,cDbKeys)).
-                 end.
-                 if cFieldWhere = "" 
-                 and valid-object(ProxyManager) then 
-                 do:
-                     // add quick lookup to check if field is present
-                     cFieldWhere  = ProxyManager:WhereExpression(phDbBuffer, entry(i,cDbKeys)).   
-                 end.
-                 if cFieldWhere = "" then
-                     undo, throw new IllegalStateError(subst("Database field &1 is not mapped and not defined as constant or proxy",cDbKey)).     
-             end.
-             else do:
-                 assign
-                     hFld   = phBuffer:buffer-field(entry(2,cKey,"."))
-                     cValue = SourceWhereFieldValue(hFld).
+                    cFieldWhere  = SourceFieldManager:WhereExpression(phDbBuffer, entry(i,cDbKeys)).
+                end.
+                if cFieldWhere = "" 
+                    and valid-object(ProxyManager) then 
+                do:
+                    cFieldWhere = if lUseBefore 
+                                  then ProxyManager:BeforeWhereExpression(phDbBuffer, entry(i,cDbKeys))
+                                  else ProxyManager:WhereExpression(phDbBuffer, entry(i,cDbKeys)).   
+                end.
+                if cFieldWhere = "" then
+                    undo, throw new IllegalStateError(subst("Database field &1 is not mapped and not defined as constant or proxy",cDbKey)).     
+            end.
+            else do:
+                assign
+                    hFld   = phBuffer:buffer-field(entry(2,cKey,"."))
+                    cValue = SourceWhereFieldValue(hFld).
                      
-                 if hFld:data-type = "character" or hFld:data-type = "longchar" or hFld:data-type begins "date" then 
-                     cValue = quoter(cValue).
-                 cFieldWhere = subst("&1 = &2",cDbKey,cValue).
-             end.  
+                if hFld:data-type = "character" or hFld:data-type = "longchar" or hFld:data-type begins "date" then 
+                    cValue = quoter(cValue).
+                cFieldWhere = subst("&1 = &2",cDbKey,cValue).
+            end.  
                    
-             assign   
-                 cWhere = cWhere + subst("&1 &2",cAnd,cFieldWhere)
-                 cAnd   = " and"
-                 .
-                
-         end.
+            assign   
+                cWhere = cWhere + subst("&1 &2",cAnd,cFieldWhere)
+                cAnd   = " and"
+                .        
+        end.
          
-         return cWhere.
+        return cWhere.
     end.    
     
     // allow override for data type conversion and dynamic resolution 
@@ -3284,7 +3479,7 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                 cPublicChanges = StringUtil:GetMessageFromEntries(cPublicChanges, "and", true). // true add quotes 
                 // needs more testing so for now jusat use the internal names if there is an error
                 catch e as IllegalArgumentError:
-                   cPublicChanges = pcFields.     
+                    cPublicChanges = pcFields.     
                 end catch.
             end.        
             
@@ -3335,7 +3530,7 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         define variable hBuffer  as handle no-undo.
         define variable cChanges as character no-undo.
         if pRowState = row-modified 
-        or pRowState = row-deleted then
+            or pRowState = row-deleted then
             hBuffer = DataBuffer:before-buffer.
         else 
             hbuffer = DataBuffer.    
@@ -3380,57 +3575,57 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                     undo, throw pe.
                 
                 when 11894  then // KEYS phrase for data source buffer <db buffer> contains ROWID and no filed in <before image table> is mapped to the rowid durng attach source                          
-                do: 
-                   cMsg = subst("Cannot save &1 changes ",BufferUtil:GetRowName(DataBuffer))
-                        + subst("because the database table key is rowid. A unique key consisting of field name(s) must be defined. This can be done in a GetDataSourceKeys override in the &1 DataSource.",
-                                 this-object:GetClass():TypeName).
-                end.    
+                    do: 
+                        cMsg = subst("Cannot save &1 changes ",BufferUtil:GetRowName(DataBuffer))
+                            + subst("because the database table key is rowid. A unique key consisting of field name(s) must be defined. This can be done in a GetDataSourceKeys override in the &1 DataSource.",
+                            this-object:GetClass():TypeName).
+                    end.    
                 when 11913  then // SAVE-ROW-CHANGES found <name> record with conflicting change by another user. (11913) 
-                do on error undo, throw: 
-                    Databuffer:find-by-rowid (phBeforeBuffer:after-rowid).
-                    FindSources(exclusive-lock).
+                    do on error undo, throw: 
+                        Databuffer:find-by-rowid (phBeforeBuffer:after-rowid).
+                        FindSources(exclusive-lock).
                     
-                    cChanges = CompareBufferWithDb(phBeforeBuffer, "", output hDataFields, output hSourceFields).
+                        cChanges = CompareBufferWithDb(phBeforeBuffer, "", output hDataFields, output hSourceFields).
                     
-                    if cChanges > "" then 
-                        StringUtil:AppendEntry(pcChanges, cChanges). 
+                        if cChanges > "" then 
+                            StringUtil:AppendEntry(pcChanges, cChanges). 
                     
-                    if pcChanges > "" then     
-                        ThrowConflictError(phBeforebuffer,BufferUtil:GetFieldLabels(Databuffer,pcChanges)).
-                    else
-                        ThrowConflictError(phBeforebuffer).  
-                    catch e1 as ConflictError :
-                        undo, throw e1.
-                    end.
-                    catch e2 as Progress.Lang.Error :
-                         BufferError(phBeforeBuffer, GetRowErrorMessage(e2:GetMessage(1),phBeforeBuffer:row-state)).
-                    end catch.     
-                end.    
+                        if pcChanges > "" then     
+                            ThrowConflictError(phBeforebuffer,BufferUtil:GetFieldLabels(Databuffer,pcChanges)).
+                        else
+                            ThrowConflictError(phBeforebuffer).  
+                        catch e1 as ConflictError :
+                            undo, throw e1.
+                        end.
+                        catch e2 as Progress.Lang.Error :
+                            BufferError(phBeforeBuffer, GetRowErrorMessage(e2:GetMessage(1),phBeforeBuffer:row-state)).
+                        end catch.     
+                    end.    
                 when 132  then 
-                do: //** <file-name> already exists with <field/value...>. (132) 
-                    cMsg = replace(cmsg,BufferHandles[piSource]:name,BufferUtil:GetRowName(phBeforeBuffer)).
-                end.
+                    do: //** <file-name> already exists with <field/value...>. (132) 
+                        cMsg = GetPublicAlreadyExistsMessage(cmsg, phBeforebuffer, piSource).
+                    end.
                 when 138 // <file-name> record not on file
                 or 
                 when 11912 /* Unable to find record for db buffer <name> during SAVE-ROW-CHANGES. */ then 
-                do: //** <file-name> record not on file. (132)
+                    do: //** <file-name> record not on file. (132)
                     // use the QueryUtil to get the QueryPredicate:ToString(buffer,useserializename)
-                    cKeyExpression = cast(QueryUtil:GetCurrentRowKeyEntry(phBeforeBuffer),Pmfo.Core.BusinessLogic.IQueryEntry):ToString(phBeforeBuffer,true).
-                    cMsg = subst("&1 where &2 does not exist",BufferUtil:GetRowName(phBeforeBuffer,true),cKeyExpression).
-                end.
+                        cKeyExpression = cast(QueryUtil:GetCurrentRowKeyEntry(phBeforeBuffer),Pmfo.Core.BusinessLogic.IQueryEntry):ToString(phBeforeBuffer,true).
+                        cMsg = subst("&1 where &2 does not exist",BufferUtil:GetRowName(phBeforeBuffer,true),cKeyExpression).
+                    end.
                 when 275 or when 110 then 
-                do: // ** <Field-name> is mandatory, but has a value of ?. (275)
+                    do: // ** <Field-name> is mandatory, but has a value of ?. (275)
                      // ** <file-name>.<field-name> is mandatory, but has unknown (?) value. (110). 
-                    cField = entry(2,cMsg," ").
-                    if num-entries(cField,".") > 1 then 
-                       cField = entry(2,CField,".").
+                        cField = entry(2,cMsg," ").
+                        if num-entries(cField,".") > 1 then 
+                            cField = entry(2,CField,".").
                     
-                    hfield = phBeforebuffer:buffer-field(cField) no-error.
-                    if valid-handle(hField) then
-                    do:
-                        entry(2,cMsg," ") = BufferUtil:GetFieldLabel(hField).
-                    end.     
-                end.
+                        hfield = phBeforebuffer:buffer-field(cField) no-error.
+                        if valid-handle(hField) then
+                        do:
+                            entry(2,cMsg," ") = BufferUtil:GetFieldLabel(hField).
+                        end.     
+                    end.
                 otherwise do:
                     // DataAccess jcjust return "ERROR" as string if dataset error, so make sure
                     // the error is added to the buffer to reach the client

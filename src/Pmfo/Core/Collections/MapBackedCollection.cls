@@ -8,7 +8,7 @@ Copyright (c) 2013, 2017, 2020, 2022, 2023 by Progress Software Corporation. All
     Description :
     Author(s)   : pjudge
     Created     : Mon Dec 16 16:24:45 EST 2013
-    Notes       : Extends corelib to ise Pmfo Iterator that supports Pmfo CharacteHolder 
+    Notes       : Extends corelib to use Pmfo Iterator that supports Pmfo *Holder 
 ----------------------------------------------------------------------*/
 block-level on error undo, throw.
 

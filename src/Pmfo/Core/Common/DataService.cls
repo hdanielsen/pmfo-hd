@@ -22,7 +22,7 @@ using Pmfo.Util.AssertUtil from propath.
 class Pmfo.Core.Common.DataService abstract implements IDataService : 
     
 	constructor static DataService (  ):
-        if not valid-object(Application:StartupManager) then 
+        if not valid-object(Ccs.Common.Application:StartupManager) then 
         do on error undo, throw:
             StartupManager:Instance. /* sets Application:StartupManager in contructor */
             // an error here is rather confusing, so clarifiy a little

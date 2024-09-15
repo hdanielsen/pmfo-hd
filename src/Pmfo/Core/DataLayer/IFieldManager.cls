@@ -51,6 +51,7 @@ interface Pmfo.Core.DataLayer.IFieldManager:
     // for spoirceWhere  - the dbbuffer is likely not needed but it is aclled from methods
     // that has this a parameter so may in theory be used for other buffer than UpdateTarget BufferHandle   
     method public character WhereExpression(phDbBuffer as handle, pcSourcename as character).
+    method public character BeforeWhereExpression(phDbBuffer as handle, pcSourcename as character).
     method public logical   SaveRow(pUpdateTarget as IUpdateTarget,phBeforeBuffer as handle). 
     method public character CheckRow(pUpdateTarget as IUpdateTarget,phBeforeBuffer as handle).
 end interface.

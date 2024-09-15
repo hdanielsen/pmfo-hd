@@ -19,6 +19,7 @@ using Pmfo.Core.DataLayer.IDataSource from propath.
 using Pmfo.Core.DataLayer.IServiceDataAccess from propath.
 using Pmfo.Core.DataLayer.IUpdateTarget from propath.
 using Pmfo.Core.BusinessLogic.EntityRequestTypeEnum from propath.
+using Pmfo.Core.BusinessLogic.IRelation from propath.
 
 interface Pmfo.Core.Manager.IServiceManager inherits IServiceManager: 
     define public property CodeTableSourceName     as character no-undo get. set. 
@@ -51,8 +52,12 @@ interface Pmfo.Core.Manager.IServiceManager inherits IServiceManager:
     
     method public IEntity CreateEntity (pcName as char).   
     method public IBusinessEntity CreateBusinessEntity (pcName as char).   
-    method public IBusinessEntity CreateBusinessEntityForRequest (pcName as char, pEntityRequestType as EntityRequestTypeEnum,  output plHasRequestedMethod as logical, output plHasReceive as logical).   
-    method public IBusinessEntity CreateBusinessEntityForGet     (pcName as char, output lHasGet as logical, output plHasReceive as logical,output plExists as logical, output plClientOnly as logical).   
+    method public IBusinessEntity CreateDynamicBusinessEntity (phContextHandle as handle,poRelation as IRelation).   
+    method public IBusinessEntity CreateBusinessEntityForRequest   (pcName as char, pEntityRequestType as EntityRequestTypeEnum,  output plHasRequestedMethod as logical, output plHasReceive as logical).   
+    method public IBusinessEntity CreateBusinessEntityForGet       (pcName as char, output lHasGet as logical, output plHasReceive as logical,output plExists as logical, output plClientOnly as logical).   
+    method public IBusinessEntity CreateBusinessEntityForTableRead (pcName as character).   
+    method public logical BusinessEntityHasRequestType             (pcName as char, pEntityRequestType as EntityRequestTypeEnum).   
+    
     
     method public IServiceEntity CreateServiceEntity (pcName as char).   
      

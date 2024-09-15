@@ -28,8 +28,10 @@
     field tempTableName   as character label "Temp-Table Name"
     field beforeTableName as character label "Before-Table Name"
     field databaseName    as character label "Database Name"
-    field sdoName         as character label "SDO"
-    field dlpName         as character label "DLP"
+    field sdoName         as character // label "SDO"
+    field dlpName         as character // label "DLP"
+    field sdoDisplayName  as character label "SDO"
+    field dlpDisplayName  as character label "DLP"
   //  field codeTableKey    as integer   format ">>>>9"  label "Code Table Key"
     
     field codeTableKey    as {&codetablekey-datatype} format {&codetablekey-format}  label "Code Table Key"

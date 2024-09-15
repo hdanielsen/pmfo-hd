@@ -17,9 +17,14 @@ using Pmfo.Core.Error.StackError from propath.
 
 block-level on error undo, throw.
 
-class Pmfo.Core.Error.NotImplementedError inherits StackError: 
+class Pmfo.Core.Error.NotImplementedError inherits StackError:
+    define variable FIXED_TEXT as character init "is not implemented" no-undo. 
     constructor public NotImplementedError ( input pmsg as character ):
-        super (input pmsg + " is not implemented").
+        super (input subst("&1 &2",pmsg,FIXED_TEXT)).
+    end constructor.
+    
+    constructor public NotImplementedError ( input pmsg as character, pcTextAfterNotimplemented as character):
+        super (input subst("&1 &2. &3",pmsg,FIXED_TEXT,pcTextAfterNotimplemented)).
     end constructor.
     
     constructor public NotImplementedError (  ):

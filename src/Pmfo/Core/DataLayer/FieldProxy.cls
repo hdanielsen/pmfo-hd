@@ -161,7 +161,7 @@ class Pmfo.Core.DataLayer.FieldProxy inherits AbstractFieldProxy:
     
     method override void SetBufferValue(pValue as character):
         if pvalue = "" then
-        do:
+        do: 
             case this-object:Field:data-type: 
                 when "integer" or when "int64" or when "decimal" then 
                      pValue = "0".  
@@ -169,12 +169,24 @@ class Pmfo.Core.DataLayer.FieldProxy inherits AbstractFieldProxy:
         end.    
         this-object:Field:buffer-value = pValue.
         catch e as Progress.Lang.Error :
-            undo, throw new IllegalStateError(subst("Field Proxy cannot assign value &1 to &2 field &3 from database field &4.&5",
+            define variable cErrorExplanation as character no-undo.
+            
+            if e:GetMessageNum(1) = 132 then 
+                cErrorExplanation = subst("The field &1 is in a unique index in the Entity, but the database has more than one record in the &2 table with value &3 in the &4 field.",
+                                          this-object:Field:name,
+                                          SourceBufferName,
+                                          if SourceDataType = "character" then quoter(pValue) else pValue,
+                                          Sourcename
+                                          ).
+            else 
+                cErrorExplanation  = e:Getmessage(1).
+            undo, throw new IllegalStateError(subst("Field Proxy cannot assign value &1 to &2 field &3 from database field &4.&5~n&6",
                                                                    if SourceDataType = "character" then quoter(pValue) else pValue,
                                                                    this-object:Field:data-type,
                                                                    this-object:Field:name,
                                                                    SourceBufferName,
-                                                                   Sourcename),
+                                                                   Sourcename,
+                                                                   cErrorExplanation),
                                              e).     
         end catch.
     end.

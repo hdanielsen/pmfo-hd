@@ -372,6 +372,7 @@ class Pmfo.Core.DataLayer.DataAccess abstract inherits DataService implements ID
         if valid-object(oTableRequest) and not lClientOnly then 
         do:    
             oDataSource = CreateDataSource(phBuffer:table-handle:serialize-name).
+           
             if not valid-object(oDatasource) then 
                 undo, throw new NotFoundError(subst("DataSource '&1'",phBuffer:serialize-name)).
             oDataSourceMap:Put(phBuffer, oDataSource).
@@ -384,9 +385,11 @@ class Pmfo.Core.DataLayer.DataAccess abstract inherits DataService implements ID
                 lok = oDataSource:Prepare(phBuffer,oTableRequest,poParentTableRequest).
             end.
             else do:   
+                
                 if cast(oTableRequest,Pmfo.Core.BusinessLogic.IGetDataTableRequest):IsMainTable then
+                do:
                     cInnerJoins =  cast(oTableRequest,Pmfo.Core.BusinessLogic.IGetDataTableRequest):GetInnerJoins(output cServerinnerJoins).
-              
+                end.
                 if cInnerJoins > "" then
                     lok = oDataSource:PrePrepare(phBuffer, oTableRequest).
                        
@@ -406,11 +409,11 @@ class Pmfo.Core.DataLayer.DataAccess abstract inherits DataService implements ID
                         if not valid-handle(hCountFld) then 
                         do:
                             phBuffer:fill-mode = "no-fill".
+                            
                         end.
                     end.    
                 end.    
             end.
-            
             if lok then  
             do iChild = 1 to phBuffer:num-child-relations:
                 hRelation = phBuffer:get-child-relation(iChild).
@@ -420,9 +423,7 @@ class Pmfo.Core.DataLayer.DataAccess abstract inherits DataService implements ID
                     StartDataSource(oDataSourceMap,hRelation:child-buffer,poRequest,oTableRequest,plInnerJoin or cInnerJoins > "").
                 
                 if lookup(hRelation:child-buffer:table-handle:name,cServerInnerJoins) > 0 then
-                do:
                     hRelation:child-buffer:fill-mode = "no-fill".
-                end.
             end.
             else 
                 phBuffer:fill-mode = "no-fill".
@@ -436,7 +437,8 @@ class Pmfo.Core.DataLayer.DataAccess abstract inherits DataService implements ID
              lok = oDataSource:PrepareInnerJoins(oTableRequest, cInnerJoins, poParentTableRequest, phBuffer:dataset).
              if not lok then
                  phBuffer:fill-mode = "no-fill".
-        end.   
+        end.
+         
         return oDataSource.
     end method.
     
@@ -731,11 +733,12 @@ class Pmfo.Core.DataLayer.DataAccess abstract inherits DataService implements ID
         define variable hChildBuffer   as handle no-undo.
         define variable hRelation      as handle no-undo.
         define variable lok            as logical no-undo.
-        define variable oRequest       as Pmfo.Core.BusinessLogic.IGetDataTableRequest no-undo.
+        define variable oRequest       as IGetDataTableRequest no-undo.
         define variable cJoin          as character no-undo.     
         define variable oDataSourceMap as IHandleDataSourceMap no-undo.
         
         oDataSourceMap = GetDataSourceMap(phDataset).
+       
         if phBuffer:table-handle:has-records then 
         do:
             oDataSource = oDataSourceMap:Get(phBuffer).
@@ -758,7 +761,8 @@ class Pmfo.Core.DataLayer.DataAccess abstract inherits DataService implements ID
                 do while phBuffer:avail:
                     if phBuffer:error = false and phBuffer:rejected = false then
                     do:
-                        oDataSource:PrepareCurrent(phBuffer, poParentRequest).
+                        // todo - check return and avoid Refill if false (in most cases refillcurrentrow is ) 
+                        oRequest = oDataSource:PrepareCurrent(phBuffer, poParentRequest).
                         if oDataSource:RefillCurrentRow() then
                         do:
                             do iChild  = 1 to phBuffer:num-child-relations:

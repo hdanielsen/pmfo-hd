@@ -11,7 +11,10 @@
 
 using Progress.Lang.*.
 using Ccs.Common.IService from propath.
+using Pmfo.Core.Service.IManagedDataValidationLogService from propath.
 
 interface Pmfo.Core.Service.IInfrastructureService inherits IService:  
     define property Dataset as handle no-undo get. 
+    define public property ManagedDataValidationLogService as IManagedDataValidationLogService no-undo get. 
+    
 end interface.

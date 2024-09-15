@@ -21,6 +21,9 @@ interface Pmfo.Core.Common.INameService:
     method public character PluralizeName(pcName as char).
          
     // public name for field
+    method public character PublicFieldName(pcTablename as character,pcName as char).
+    
+    // public name for field (on clienrt with no db table)
     method public character PublicFieldName(pcName as char).
     
     // class name (basis for datasource and business entity)

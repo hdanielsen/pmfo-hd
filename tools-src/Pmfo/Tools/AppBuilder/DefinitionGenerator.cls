@@ -74,7 +74,7 @@ class Pmfo.Tools.AppBuilder.DefinitionGenerator:
         
         ResourceModel = new ResourceModel().
         oDataFields = ResourceModel:GetDataFields(dbTable).
-        ResourceModel:AddPublicNameToFields(oDataFields, NameService).
+        ResourceModel:AddPublicNameToFields(dbTable:name,oDataFields, NameService).
              
         assign
             Indexes          = DbTable:indexes

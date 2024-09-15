@@ -49,7 +49,7 @@ class Pmfo.Core.Common.Function inherits Method implements IFunction:
     // (TODO) consider add subclass for primitive to manage differences instgewd of property
     define private variable BindingIsSet as logical no-undo. 
     
-    define public property Binding    as MethodBindingEnum no-undo 
+    define public override property Binding    as MethodBindingEnum no-undo 
         get():
             if not valid-object(Binding) then 
                 // Default collection - functions are typically used for complex queries of a collection

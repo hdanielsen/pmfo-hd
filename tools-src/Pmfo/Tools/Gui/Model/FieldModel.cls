@@ -23,8 +23,9 @@ class Pmfo.Tools.Gui.Model.FieldModel:
     define property sourceTable     as char     get. set.    
     define property sourceName      as char     get. set.    
     define property dataType        as char     get. set.
-    define property IsCalc          as logical  get. set.
     define property inSDO           as logical  get. set.
+    define property IsCalc          as logical  get. set.
+    define property isJoin          as logical  get. set.
     define property IsExcluded      as logical  get. set.
     define property calculation     as longchar get. set. 
     
@@ -39,5 +40,22 @@ class Pmfo.Tools.Gui.Model.FieldModel:
                    .   
         return false.                       
     end method.
- 
+    
+    
+    /*------------------------------------------------------------------------------
+     Purpose:
+     Notes:
+    ------------------------------------------------------------------------------*/
+    constructor public FieldModel ():
+        super().
+    end constructor.
+    
+    constructor public FieldModel (pcTableName as character, pcName as character):
+        super ().
+        name = pcName.
+        sourcename = pcName.
+        sourceTable = pcTableName.
+        
+    end constructor.
+
 end class.

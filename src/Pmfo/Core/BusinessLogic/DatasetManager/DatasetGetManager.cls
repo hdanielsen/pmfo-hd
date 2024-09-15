@@ -24,6 +24,7 @@ using Pmfo.Core.BusinessLogic.IRequest from propath.
 using Pmfo.Core.Error.IllegalArgumentError from propath.
 using Pmfo.Core.Error.IllegalStateError from propath.
 using Pmfo.Core.Manager.ServiceManager from propath.
+using Pmfo.Core.BusinessLogic.IDynamicBusinessEntity from propath.
 
 class Pmfo.Core.BusinessLogic.DatasetManager.DatasetGetManager inherits AbstractDatasetManager implements IDatasetGetManager: 
     
@@ -72,6 +73,8 @@ class Pmfo.Core.BusinessLogic.DatasetManager.DatasetGetManager inherits Abstract
             else do:
                 // check table serialize-name. Buffer serialize-name may be defined to support a request for an alias (i.e Relation:AliasName)
                 oEntity = ServiceManager:CreateBusinessEntityForGet(phbuffer:table-handle:serialize-name, output lPrepareGet, output lServiceSubscribe, output lServiceExists, output lServiceClientOnly ).
+                if type-of(oEntity,IDynamicBusinessEntity) then
+                    cast(oEntity,IDynamicBusinessEntity):SetBuffer(phBuffer).
                 if lServiceExists then
                 do:
                     if lServiceClientOnly then 

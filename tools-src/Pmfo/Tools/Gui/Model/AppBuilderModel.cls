@@ -57,6 +57,7 @@ class Pmfo.Tools.Gui.Model.AppBuilderModel abstract  :
     ------------------------------------------------------------------------------*/
 
     method protected logical ReadLine( pcLine as char ):
+        
         if pcLine begins "&Scoped-define PROCEDURE-TYPE" then 
         do:
             if entry(3,pcLine," ") <> ProcedureType then do:
@@ -104,6 +105,7 @@ class Pmfo.Tools.Gui.Model.AppBuilderModel abstract  :
             end.       
             else do:
                 lOk = ReadLine(cLine).
+                
                 if not lok then 
                     return false.
             end.    

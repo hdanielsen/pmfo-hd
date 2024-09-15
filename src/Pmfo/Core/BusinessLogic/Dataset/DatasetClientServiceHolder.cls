@@ -17,8 +17,9 @@ using Pmfo.Core.BusinessLogic.Dataset.DatasetHolder from propath.
 using Pmfo.Core.BusinessLogic.Dataset.IDatasetClientServiceHolder from propath.
 using Pmfo.Core.BusinessLogic.GetDataTableRequest from propath.
 using Pmfo.Core.BusinessLogic.IGetDataRequest from propath.
+ 
 
-class Pmfo.Core.BusinessLogic.Dataset.DatasetClientServiceHolder inherits DatasetHolder implements IDatasetClientServiceHolder: 
+class Pmfo.Core.BusinessLogic.Dataset.DatasetClientServiceHolder abstract inherits DatasetHolder implements IDatasetClientServiceHolder: 
     
     define public    property ServerDataset   as handle no-undo get. protected set.
     
@@ -29,7 +30,7 @@ class Pmfo.Core.BusinessLogic.Dataset.DatasetClientServiceHolder inherits Datase
     
     // clones the client data request and adds TableRequests for missing tables 
     // removes the NamedQuery as the assumtion is that this is used in a Function 
-     
+    
     method public IGetDataRequest CreateServerDataRequest(pClientDataRequest as IGetDataRequest).
         define variable oRequest as IGetDataRequest no-undo.
         define variable i as integer no-undo.
@@ -37,6 +38,10 @@ class Pmfo.Core.BusinessLogic.Dataset.DatasetClientServiceHolder inherits Datase
         oRequest = cast(pClientDataRequest:Clone(),IGetDataRequest). 
         do i = 1 to ServerDataset:num-buffers: 
             hBuffer = ServerDataset:get-buffer-handle(i).
+            
+            // may have a different top request
+            if i = 1 and not valid-handle(hBuffer:parent-relation) then 
+                 oRequest:MainRequestedBuffer = hBuffer:name. 
             
             if not valid-object(oRequest:GetTableRequest(hBuffer:table-handle:name)) then 
             do:

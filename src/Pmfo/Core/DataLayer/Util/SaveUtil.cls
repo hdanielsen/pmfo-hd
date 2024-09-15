@@ -83,9 +83,7 @@ class Pmfo.Core.DataLayer.Util.SaveUtil // implements IFieldManager
             if phBeforeBuffer:row-state = row-modified then
                 pUpdateTarget:FindSource(phBeforeBuffer,pUpdateTarget:BufferHandle,exclusive-lock).
             else do:  
-                
                 pUpdateTarget:BufferHandle:buffer-create.
-                
             end.
             cFieldMap   = hAfterBuffer:data-source-complete-map.
             iNumEntries = num-entries(cFieldMap).
@@ -128,11 +126,13 @@ class Pmfo.Core.DataLayer.Util.SaveUtil // implements IFieldManager
                         end.
                         else  
                             hdbField:buffer-value(iDbExtent) = hField:buffer-value(iFieldExtent).
-                        lProcessed = true. // NOTE true means ok saved or if check bad difference
+                        lProcessed = true. // NOTE true means bad difference for check
                     end.
                 end.
             end.
-            return lProcessed. 
+            // we need to return true for check false since a record is created or found
+            // even if there are no fields here
+            return if plCheck then lProcessed else true. 
         end.    
     end method.     
     

@@ -18,9 +18,10 @@ using Pmfo.Tools.Appbuilder.ICodeTableModel from propath.
 interface Pmfo.Tools.Gui.Model.IResourceModel inherits IModel:  
     {Pmfo/Tools/AppBuilder/resourcedata.i reference-only}
     define public property CodeTableModel as ICodeTableModel no-undo get. set.
+    define public property AdoModelType   as Progress.Lang.Class no-undo get. set. 
     define public property DefinitionDir  as char no-undo get. set. 
-    define public property NameService as INameService no-undo get. set.
-    define public property MonitorSources   as character extent no-undo get. set.
+    define public property NameService    as INameService no-undo get. set.
+    define public property MonitorSources as character extent no-undo get. set.
     
     method public handle GetTable(pcTable as char).
     // call back for external objects that creates resources

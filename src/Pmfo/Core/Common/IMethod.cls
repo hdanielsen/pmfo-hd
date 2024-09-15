@@ -16,7 +16,14 @@ using Progress.Json.ObjectModel.JsonArray from propath.
 using Pmfo.Core.BusinessLogic.MethodBindingEnum from propath.
 
 interface Pmfo.Core.Common.IMethod:  
-     define public property Name             as character         no-undo get.  
+     define public property Name             as character         no-undo get.
+     // set for openAPi may also cause warnings  
+     define public property IsDeprecated    as logical           no-undo  get. set.
+     // optional info about how to repalce the call. i.e the issue that should be implemented to eliminate this usage 
+     define public property DeprecatedRemoveCallInfo as character        no-undo  get. set.
+     // optional warning text for deprecated method
+     define public property DeprecatedWarning as character        no-undo  get. set.
+ 
      //  define public property Parameters       as IParameter extent no-undo get.  
  //    define public property Signatures       as ISignature extent no-undo get.  
      
@@ -29,10 +36,12 @@ interface Pmfo.Core.Common.IMethod:
    //  define public property Parent           as character         no-undo get.  
   //   define public property Bound            as logical           no-undo get.
   // need some thought - can/should we enforce single row in body? 
-  //   define public property Binding          as MethodBindingEnum no-undo get. set.  
+   
      define public property IsPrimitive      as logical           no-undo  get. set.
        
      define public property SingleObject     as logical           no-undo get. set.
+     define public property Binding          as MethodBindingEnum no-undo get. set.
+        
      
      // what to call the type in error message 
      define public  property BaseTypeName  as character no-undo get.
@@ -40,7 +49,7 @@ interface Pmfo.Core.Common.IMethod:
      // should default to NONE - should only be defined for methods that 
      // need different (typically more) server types than the main requested buffer  
      define public  property ServerType    as ServerTypeEnum no-undo get.
-     
+     define public property Signatures     as ISignature extent no-undo get.  
      // return no content if successful 
      define public property NoContentResponse as logical no-undo get. set.
      
@@ -53,10 +62,13 @@ interface Pmfo.Core.Common.IMethod:
      method public ISignature DefineSignature(pParameter as IParameter).
      method public ISignature DefineSignature(pParameters as IParameter extent).
      method public ISignature DefineSignature().
+   
      method public character GetPublicLinkTemplate(piSignature as integer).
      /** catalog info **/  
      method public JsonArray DescribeSignatures(pcPath as character, phBuffer as handle).
      method public logical   IsParametersRequired().
+     // allow openapi to create parameters 
+     method public void      InitializeSignatures().
      
      
 end interface.

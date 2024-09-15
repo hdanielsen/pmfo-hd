@@ -20,7 +20,8 @@ class Pmfo.Tools.Gui.Model.LookupResourceModel inherits AbstractResourceModel im
     
     // TODO - refactor away from ResourceModel or move this class to a higher level interface that does not have ot? - exists in IResourceModel since it ios used by WinDesign   
     define public property MonitorSources   as character extent no-undo get. set.
-    
+      define public property AdoModelType as Progress.Lang.Class no-undo get. set. 
+  
     constructor public LookupResourceModel (  ):
         super (input "LookupModel").
     end constructor.

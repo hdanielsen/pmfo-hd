@@ -41,6 +41,7 @@ using Pmfo.Util.DatasetUtil from propath.
 using Pmfo.Tools.Appbuilder.ICodeTableModel from propath.
 using Pmfo.Core.Common.ServerTypeEnum from propath.
 using Pmfo.Util.BufferUtil from propath.
+using Pmfo.Tools.Gui.Model.ISdoModel from propath.
 
 class Pmfo.Tools.AppBuilder.CodeGenerator inherits DataService: 
     {Pmfo/Tools/AppBuilder/resourcedata.i }
@@ -84,11 +85,15 @@ class Pmfo.Tools.AppBuilder.CodeGenerator inherits DataService:
 /*        end get.                                              */
 /*        set.                                                  */
         
-    define protected Property ServiceManager as IServiceManager no-undo 
+    define protected property ServiceManager as IServiceManager no-undo 
         get():
             if not valid-object(ServiceManager) then 
             do:
-                Servicemanager = cast(Application:ServiceManager,IServiceManager). 
+                // NOTE-  fullpath - does not resolve from using when referenced  from /work in other workspace!
+                //                     somehow the cls is picked up - works if only r-code 
+                //                     related to 12.7  pds problems with cache of code (seems unlikely, but) ?? !   
+                 
+                Servicemanager = cast(Ccs.Common.Application:ServiceManager,IServiceManager). 
             end.
             return ServiceManager.
         end get. 
@@ -163,7 +168,6 @@ class Pmfo.Tools.AppBuilder.CodeGenerator inherits DataService:
     method protected void GenerateResource( pdefs as logical, psource as logical, pbe as logical,input table resourceData):
         define variable cDefinitionRelativeFile as character no-undo.
         cDefinitionRelativefile = DefinitionDir + "/" + lc(substr(resourceData.className,1,1)) + substr(resourceData.className,2) + ".i". 
-     
         if pDefs then
         do: 
             if resourceData.onlyInclude = true then
@@ -193,7 +197,7 @@ class Pmfo.Tools.AppBuilder.CodeGenerator inherits DataService:
         define variable cSdoShortName   as character no-undo.
         define variable i               as integer no-undo.
         define variable oService        as IDataAdminService no-undo.
-        
+         
         // TODO add some logic - this is assuming class name ends with DS
            // todo add property for deffields with changed names or serializenames 
         if resourcedata.sdoname > "" then 
@@ -216,16 +220,16 @@ class Pmfo.Tools.AppBuilder.CodeGenerator inherits DataService:
                   cindexAsStrings[1] = "/* index defintions not copied from SDO  */". 
                end.           
             end.
-/*            else do:                                                                                                                   */
-/*                oService = GetService(cDbName).                                                                                        */
-/*                if not valid-object(oService) then                                                                                     */
-/*                do:                                                                                                                    */
-/*                     undo, throw new IllegalOperationError(subst("Database &1 used in SDO &2 is not connected",cDbName,cSdoShortname)).*/
-/*                end.                                                                                                                   */
-/*                cinfo = subst("Mapped to database &1 table &2. Fields copied from SDO &1",cDbName,cTableName,cSdoShortname).           */
-/*                oTable = oservice:GetTable(cTableName).                                                                                */
-/*                oIndexes = oTable:indexes.                                                                                             */
-/*            end.                                                                                                                       */
+            else do:
+                oService = GetService(cDbName).
+                if not valid-object(oService) then
+                do:
+                     undo, throw new IllegalOperationError(subst("Database &1 used in SDO &2 is not connected",cDbName,cSdoShortname)).
+                end.
+                cinfo = subst("Mapped to database &1 table &2. Fields copied from SDO &1",cDbName,cTableName,cSdoShortname).
+                oTable = oservice:GetTable(cTableName).
+                oIndexes = oTable:indexes.
+            end.
         end.
         else if resourceData.tableName > "" then
         do:
@@ -248,7 +252,7 @@ class Pmfo.Tools.AppBuilder.CodeGenerator inherits DataService:
             cinfo = codeTableModel:GetCodeTableNotes(resourceData.codeTableName).
                
         end. 
-     
+        
         if valid-object(oFields) then       
             GenerateDefinition(resourceData.includefile,resourceData.tempTableName,resourcedata.entityName,resourceData.beforeTableName,oFields,oIndexes,cindexAsStrings,cInfo).
        
@@ -314,7 +318,6 @@ class Pmfo.Tools.AppBuilder.CodeGenerator inherits DataService:
 /*        end.                */
 /*                            */
         find resourcedata where rowid(resourcedata) = prowid no-error.
-        
         GenerateResource(pdefs,psource,pbe,input table resourceData by-reference).  
         
         if not pNoRepository then
@@ -505,6 +508,7 @@ class Pmfo.Tools.AppBuilder.CodeGenerator inherits DataService:
         // argh 
         put stream definitions unformatted  
             subst("field &1 as &2 serialize-hidden",cSeqName + fill(" ",32 - length(cSeqName)),cSeqType + fill(" ",11 - length(cSeqType)))  at 4 skip .
+        
         if extent(pIndexAsStrings) > 0 then
         do iIndex = 1 to extent(pIndexAsStrings): 
             put stream definitions unformatted pIndexAsStrings[iIndex] at 4.
@@ -554,8 +558,13 @@ class Pmfo.Tools.AppBuilder.CodeGenerator inherits DataService:
     
     method protected void WriteCode(phStream as handle, pCode as longchar):
        define variable i as integer no-undo.
+       define variable lLastBlank as logical no-undo.
+       define variable cLine as character no-undo.
        do i = 1 to num-entries(pCode,StringConstant:LF).
-           put stream-handle phStream unformatted string(entry(i,pCode,StringConstant:LF)) at 5 skip .
+           cLine = string(entry(i,pCode,StringConstant:LF)).
+           //if cLine > "" and lLastBlank = false then
+               put stream-handle phStream unformatted cLine at 5 skip .
+          // lLastBlank = cLine = "".    
        end. 
     end method.
     
@@ -615,11 +624,16 @@ class Pmfo.Tools.AppBuilder.CodeGenerator inherits DataService:
         define variable i                    as integer no-undo.
         define variable oIter                as IIterator no-undo.
         define variable oMethod              as MethodModel no-undo.
-        
+        define variable oFields              as ICollection no-undo.
+        define variable lAddAfterRowComments as logical no-undo.
+        define variable oFieldIterator       as IIterator no-undo.
+        define variable oField               as FieldModel no-undo.
+        define variable lAnyCalc             as logical no-undo.
         oDataSourceModel = cast(resourceData.DataSourceModel,DataSourceModel).         
         cFullName = GetDataSourceFullPath(DataSourceDir, resourceData.dataSource,"cls").
         cRelativeName = replace(DataSourceDir,"/",".") + "." + resourceData.dataSource.
         
+     
         output stream sources to value(cFullname).
         GenerateHeaderComments(stream sources:handle,cRelativeName,"").
         
@@ -670,24 +684,64 @@ class Pmfo.Tools.AppBuilder.CodeGenerator inherits DataService:
         
         put stream sources unformatted string(ConvertTemplate(MethodPrepareSaveBufferTemplate)). 
         
+     
+        
         oIter = oDataSourceModel:Methods:Iterator().
         
+        if resourcedata.sdoname > "" then 
+            oFields = cast(resourcedata.sdofields,ICollection).
+        else if resourceData.tableName > "" then
+            oFields = cast(resourceData.dbFields,ICollection).
+        else if resourceData.codeTableName > "" then
+        do:
+            if not valid-object(resourcedata.codeTableFields) then
+                resourcedata.codeTableFields = codeTableModel:GetCodeTableFields(resourceData.codeTableName).
+             
+            if valid-object(resourcedata.codeTableFields) then     
+                ofields = cast(resourceData.codeTableFields,ICollection).
+        end.
+        
+        methodloop: 
         do while oIter:HasNext():
             oMethod = cast(oIter:Next(),MethodModel).
-            put stream sources unformatted subst("method &1 override void &2(&3):",
+            lAnyCalc = false.
+            if oMethod:name = "AfterRow" and valid-object(oFields) then 
+            do:
+                oFieldIterator = oFields:Iterator().
+                do while oFieldIterator:hasNext():
+                    oField = cast(oFieldIterator:Next(),FieldModel).
+                    if oField:isCalc and oField:IsExcluded = false then 
+                    do: 
+                        lAnyCalc = true.
+                        leave.
+                    end.          
+                end.
+                if lAnyCalc = false then
+                    next methodloop.
+            end.        
+            put stream sources unformatted subst("method &1 override &2 &3(&4):",
                                                  // TODO move this to ParameterModel
                                                  if oMethod:name = "AfterRow" then "public" else "protected",
+                                                 if oMethod:DataType = ? then "void"
+                                                 else if oMethod:DataType:ToString() matches "*array" then lc(OpenEdge.Core.DataTypeHelper:GetMask(oMethod:DataType))  
+                                                      else lc(oMethod:DataType:ToString()),
                                                  oMethod:name,
                                                  GetMethodParameters(oMethod)
-                                                 )                                            at 5 skip.
-            if oMethod:name = "AfterRow" then
+                                                 )
+                at 5 skip.
+                
+            // TODO move to CodeConverter
+            lAddAfterRowComments = false.
+            if oMethod:name = "AfterRow" and index(oMethod:code,"super:AfterRow") = 0 then
             do:
                 put stream sources unformatted "super:AfterRow(input dataset-handle phDataSet by-reference)."           at 9 skip.
                 put stream sources unformatted "/**** calculated fields in SDO "           at 9 skip.
-                
+                lAddAfterRowComments = true. //
             end.                                             
             WriteCode(stream sources:handle, oMethod:Code).                                     
-            if oMethod:name = "AfterRow" then
+            
+            if lAddAfterRowComments //oMethod:name = "AfterRow"
+             then
             do:
                 put stream sources unformatted "****/ "           at 9 skip.
             end.
@@ -721,7 +775,7 @@ class Pmfo.Tools.AppBuilder.CodeGenerator inherits DataService:
         cFullName = GetApplicationFullPath(BusinessDir, resourceData.businessEntity,"cls").
         cRelativeName = replace(BusinessDir,"/",".") + "." + resourceData.businessEntity.
         output stream business to value(cFullname).
-        
+         
         GenerateHeaderComments(stream business:handle,cRelativeName,"").
         put stream business skip(1).
         
@@ -787,7 +841,7 @@ class Pmfo.Tools.AppBuilder.CodeGenerator inherits DataService:
     
     method protected void StoreDataSource(table resourceData):
         define variable cSourceName as character no-undo.
-        define variable oSDo as SdoModel no-undo.
+        define variable oSDo as ISdoModel no-undo.
         define variable ofields as ICollection no-undo.
         define variable oIter as IIterator no-undo.
         define variable ofield as FieldModel no-undo.
@@ -836,7 +890,7 @@ class Pmfo.Tools.AppBuilder.CodeGenerator inherits DataService:
                 .
             if valid-object(resourceData.SdoModel) then 
             do: 
-                oSDO = cast(resourceData.SdoModel,SDOModel).   
+                oSDO = cast(resourceData.SdoModel,ISDOModel).   
               //  ttdataSource.FieldMap = oSdo:GetAssignListNoRowObject().
             end.    
         end.

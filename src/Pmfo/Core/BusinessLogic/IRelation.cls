@@ -27,6 +27,12 @@ interface Pmfo.Core.BusinessLogic.IRelation inherits IRelationDefinition:
     define public property LinkToEmpty    as logical no-undo get. set. 
     
     define public property LookupFunction as character no-undo get. set. 
+
+    // set at creation to tell link routers to call CreateDynamicBusinessEntity
+    // with parent buffer and this relation as context when starting the BE  
+    // The BE must implement IDynamicBusinessEntity
+    define public property IsDynamic      as logical no-undo get. set. 
+
     // use foreign key for many-to-one to entity with single primary key
     // when there is only one key then we can use just the foreign value in the URI
     // and there is no need to know the schema of the other object 

@@ -36,6 +36,12 @@ interface Pmfo.Core.BusinessLogic.IGetDataTableRequest inherits IGetDataTableReq
     define public property InnerJoinExpands    as character   no-undo  get. set.
     // derrived from spply with qualified aggregate options  
     define public property InnerJoinAggregates as character   no-undo  get. set.
+    // set in request to specify that child join table is server only for cases where the 
+    // current automatic logic does not work 
+    //(i.e if the qualified filter is on on a grand child field it will currently not be 
+    // detected by the DataAccess when managing innerjoins   
+    // as of current it will only be used for cases were this table is not expanded 
+    define public property ManualServerInnerJoins as character   no-undo  get. set.
     
     /* 
     Optional list of fields to select. 
@@ -96,10 +102,12 @@ interface Pmfo.Core.BusinessLogic.IGetDataTableRequest inherits IGetDataTableReq
     method public logical HasPredicate(pcField as character, pOperator as QueryOperatorEnum).
     method public logical HasPredicate(pcFields as character extent, pOperator as QueryOperatorEnum).
     
+    
     method public IQueryPredicate GetQueryPredicate(pcField as character, pOperator as QueryOperatorEnum).
     method public IQueryPredicate GetQueryPredicate(pcField as character).
     method public logical RemoveQueryEntry(pQueryEntry as IQueryEntry).
     method public logical AddQueryEntry(pQueryEntry as IQueryEntry).
+    method public logical HasQueryEntry(pQueryEntry as IQueryEntry).
     
     method public logical AddQueryEntry(pcField as character,pOperator as QueryOperatorEnum,pcValue as character).
     method public logical AddQueryEntry(pcField as character,pOperator as QueryOperatorEnum,piValue as int64).

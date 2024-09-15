@@ -28,13 +28,12 @@ using Pmfo.Util.PrimitiveHolderUtil from propath.
 using Pmfo.Util.StringUtil from propath.
 using Progress.Json.ObjectModel.JsonObject from propath.
 using Progress.Lang.Error from propath.
-using Pmfo.Core.BusinessLogic.IBusinessEntityFinder from propath.
-using Pmfo.Core.BusinessLogic.IBusinessEntity from propath.
-using Pmfo.Core.BusinessLogic.BusinessEntityFinder from propath.
 using Pmfo.Util.ServiceInfo from propath.
 using Pmfo.Core.Error.NotFoundError from propath.
 using Pmfo.Core.Error.TableNotFoundError from propath.
-
+using Pmfo.Util.QueryUtil from propath.
+using Pmfo.Core.BusinessLogic.IQueryEntry from propath.
+ 
 class Pmfo.Util.BufferUtil: 
      // cannot have field that start with _ since index-information throws STOP 
     define public  static  property SeqFieldName as character no-undo init "zz_seq" get. set.
@@ -126,60 +125,6 @@ class Pmfo.Util.BufferUtil:
         
     end method.
     
-    method public static void ConvertCreatesToModified(pBE as IBusinessEntity,phbuffer as handle):
-        ConvertCreatesToModified(pBE, phbuffer, "").
-    end method.
-    
-    method public static void ConvertCreatesToModified(pBE as IBusinessEntity,phbuffer as handle,pcQueryExpression as character):
-        define variable oBusinessEntityFinder as IBusinessEntityFinder no-undo.
-        define variable cKeyNames             as character no-undo.
-        define variable hQuery                as handle no-undo.
-        define variable oKey                  as IKey no-undo.
-        define variable hTable                as handle no-undo.
-        if pcQueryExpression = ? then pcQueryExpression = "".
-        
-        oBusinessEntityFinder = new BusinessEntityFinder(pBE:Resource).
-        cKeynames = pBE:GetKeys().
-        create query hQuery.
-        hQuery:add-buffer(phbuffer).
-        hQuery:query-prepare (right-trim(subst("for each &1 where row-state(&1) = row-created &2",
-                                               phbuffer:name,
-                                               if pcQueryExpression = "" then "" else subst("and &1",pcQueryExpression)
-                                              )
-                              )). // prepare - right-trim
-        hQuery:query-open().
-        hQuery:get-first.
-          
-        do while phbuffer:available:    
-            oKey = ServiceInfo:GetKey(phbuffer).  
-            do on error undo, throw:
-                oBusinessEntityFinder:Find(oKey, output table-handle hTable).
-                hTable:default-buffer-handle:find-unique(). // if we get here it exists
-              
-                catch e as NotFoundError :
-                    // expected error from entityfinder      
-                end catch.
-            end.
-            // convert to row modified  with current server data as before image
-            if valid-handle(hTable) and hTable:default-buffer-handle:avail then 
-            do: 
-                
-                phbuffer:before-buffer:find-by-rowid (phBuffer:before-rowid).
-                phbuffer:before-buffer:accept-row-changes.
-                phBuffer:mark-row-state (row-modified, hTable:default-buffer-handle).
-            end.
-            hQuery:get-next.
-        end.  
-        finally:
-            if valid-handle(hQuery) then 
-                delete object hQuery.
-                
-            if valid-handle(hTable) then 
-                delete object hTable.    
-        end.    
- 
-    end method.     
-      
     method public static logical MarkRowState(phbuffer as handle,pState as integer):
         define variable rRowid       as rowid no-undo.
         define variable rBeforeRowid as rowid no-undo.
@@ -922,7 +867,36 @@ class Pmfo.Util.BufferUtil:
             return StringUtil:UpperCaseFirst(cName).
         else 
             return cName.       
-    end method.    
+    end method.  
+    
+     // name of row for single row requests error messages etc
+    method static public character GetCurrentRowAsText(phHandle as handle):
+        define variable oQueryentry as IQueryEntry no-undo.
+        
+        case phHandle:type:
+            when "buffer" then do:
+                if valid-handle(phHandle:after-buffer) then 
+                    phHandle = phHandle:after-buffer.
+            end. 
+            when "temp-table" then do:
+                if valid-handle(phHandle:after-table) then 
+                    phHandle = phHandle:after-table.
+            end.
+            otherwise 
+                undo, throw new IllegalArgumentError(subst("Handle of type &1",phHandle:type)). 
+        end case.
+        if not phHandle:avail then 
+            undo, throw new IllegalOperationError(subst("Buffer &1 is not available",phHandle:name )).
+        
+        oQueryentry = cast(QueryUtil:GetCurrentRowKeyEntry(phHandle),IQueryEntry). 
+        return subst("&1 where &2",
+                      GetRowName(phHandle, true), // uppercase first
+                      oQueryentry:ToString(phHandle, 
+                      true, // public
+                      true) //trim pouter parenthesis if applicable
+                 ).
+                
+    end method.      
     
     method static public character GetRowName(phHandle as handle):
     
@@ -1056,6 +1030,13 @@ class Pmfo.Util.BufferUtil:
             return StringUtil:CamelToWords(pFld:serialize-name).  
     end method.    
     
+    method public static character GetFieldValueForMessage(pfld as handle):
+        if pFld:data-type = "character" or pFld:data-type begins "date" then 
+            return quoter(pFld:buffer-value,"'").
+        else 
+            return pFld:buffer-value.  
+    end method.    
+    
     // get a serializename of field name in buffer - handles extent reference   
     method public static character GetFieldSerializeName(phBuffer as handle,pcfieldname as char):
         define variable iArrayPos as integer   no-undo.
@@ -1087,6 +1068,18 @@ class Pmfo.Util.BufferUtil:
             return hField:serialize-name.          
     end method.     
     
+    method public static void HideCalculatedFields(phBuffer as handle):
+        define variable i as integer no-undo.
+        if not valid-handle(phBuffer) then
+           undo, throw new IllegalArgumentError("Invalid handle").
+        if phBuffer:type <> "buffer" then
+           undo, throw new IllegalArgumentError(subst("Handle of Type '&1'",phBuffer:type)).
+        do i = 1 to phBuffer:num-fields: 
+            if index(phBuffer:buffer-field(i):serialize-name,"@") > 0 then 
+               phBuffer:buffer-field(i):serialize-hidden = true.
+        end.    
+         
+    end method.    
     
     /***
     Return a list of changes for a buffer by comparing before and after 
@@ -1110,6 +1103,31 @@ class Pmfo.Util.BufferUtil:
         hBefore = AssertAndGetBeforeBuffer(phBuffer).        
         return CompareFields(phbuffer,hBefore,pcExcept,output hDummy, output hDummy2).  
     end method.
+    
+     /** used to append text to show differences when comparing data with a list of Ids that has trhe same values together
+       I.E Parts 123, 345, 4567 has metal type 6 ()
+      hard coded line break delimiter for now - add overload if needed  
+      @param - diff text - the current value to append to 
+      @param - buffer    - the buffer to use as label for keys  
+      @param - idlist    - concatenated list of key values (so currently only fore single key) 
+      @param - valueText - The value for all the records with the id. Label included and typcially both a key and description  
+     **/
+    method public static character AppendDifferences(pcDiffText as character, phBuffer as handle, pcIdList as character,pcValueText as character) : 
+        return StringUtil:AppendEntry(pcDiffText,
+                                      subst("&1 &2 &3 &4", 
+                                            subst("&1:",
+                                                  if num-entries(pcIdList) > 1 
+                                                  then StringUtil:UpperCaseFirst(phBuffer:serialize-name)
+                                                  else GetRowName(phbuffer,true)
+                                            ),
+                                            StringUtil:GetMessageFromEntries(pcIdList),
+                                            if num-entries(pcIdList) > 1 then "have" else "has",
+                                            // add period, but ensure only one
+                                            subst("&1.",right-trim(pcValueText,"."))
+                                           ),
+                                      "~n"       
+                                     ) .
+    end method.  
     
     method static public handle AssertAndGetBeforebuffer(phbuffer as handle):
         define variable hBefore as handle no-undo.
@@ -1534,6 +1552,4 @@ class Pmfo.Util.BufferUtil:
             undo, throw e.    
         end catch.
     end method.
-   
-    
 end class.

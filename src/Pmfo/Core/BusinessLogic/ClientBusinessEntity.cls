@@ -23,14 +23,25 @@ using Pmfo.Core.BusinessLogic.QueryBuilder.QueryRemovePredicateTableQualifier fr
 using Pmfo.Core.BusinessLogic.IQueryEntry from propath.
 using Pmfo.Core.BusinessLogic.QueryGroup from propath.
 using Ccs.BusinessLogic.IQuerySortEntry from propath.
+using Pmfo.Core.Error.NotImplementedError from propath.
+using Progress.Lang.Object from propath.
+using Pmfo.Core.BusinessLogic.IUpdateDataRequest from propath.
+using Pmfo.Core.BusinessLogic.IReceiveDataEventArgs from propath.
  
 class Pmfo.Core.BusinessLogic.ClientBusinessEntity  abstract inherits BusinessEntity implements IClientEntity: 
     
     define protected property NoParentJoin as logical no-undo get. set. 
     define protected property InnerJoinQueryEntries as IQueryEntry extent no-undo get. set.
-     
+    
+    
     constructor public ClientBusinessEntity ( input phHandle as handle ):
         super (input phHandle).
+        ClientOnly = true.
+    end constructor.
+     
+    // dynamic create on the fly BEs only know resource name
+    constructor protected ClientBusinessEntity (pcResource as character):
+        super(pcResource).
         ClientOnly = true.
     end constructor.
     
@@ -69,17 +80,11 @@ class Pmfo.Core.BusinessLogic.ClientBusinessEntity  abstract inherits BusinessEn
     // the call back from the ClientDataSource
     method public abstract int64 CreateSourceRecords(output table-handle phTable).
     
-    // there should be an application .level subclass that defines this final
-    method override protected void ReceiveData( input pParent as Pmfo.Core.BusinessLogic.IBusinessEntity, input pReceiveDataArgs as Pmfo.Core.BusinessLogic.IReceiveDataEventArgs, input phDataset as handle ):
-         // hook for high level request info
-        BeforeReceiveData(pReceiveDataArgs, phDataset).
-         
-        super:ReceiveData(pParent, pReceiveDataArgs, phDataset).
-    end method. 
-    
-    // override by subclass to track high level request info
-    method void BeforeReceiveData( input pReceiveDataArgs as Pmfo.Core.BusinessLogic.IReceiveDataEventArgs, input phDataset as handle ):
-    end method. 
+    // hook for save to server after all vlaidation has been done - called from SubmitData  
+    method public Object SubmitClientData(poUpdateDataRequest as IUpdateDataRequest, input-output dataset-handle phDataset, input dataset-handle phInfrastructureDataset, output table-handle phWarning).
+        // update is rarely called in ClientBe , but if it is then it need to have an override with behavior 
+        undo, throw new NotImplementedError(subst("SubmitData in ClientBusinessEntity &1",Resource)).
+    end method.   
       
     // final - the data is to be created in CreateSourceRecords that the ClientDataSource uses to filter and sort if necessary
     method override final protected void ReceiveBuffer( input pParent as IBusinessEntity, input pRequest as IGetDataTableRequest, input pResponse as IGetDataTableResponse, input phBuffer as handle ):

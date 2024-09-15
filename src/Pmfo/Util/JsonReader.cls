@@ -45,6 +45,7 @@ using OpenEdge.Core.ByteBucket from propath.
 using Pmfo.Core.Common.WarningMessages from propath.
 using Pmfo.Util.StringUtil from propath.
 using Pmfo.Util.UnconvertableAsciiCharacterUtil from propath.
+using Pmfo.Core.BusinessLogic.IJsonExtendedReadAndBeforeDeleteHandler from propath.
  
 class Pmfo.Util.JsonReader: 
     
@@ -335,7 +336,6 @@ class Pmfo.Util.JsonReader:
         define variable cBadBeforeJsonTmpl as character no-undo
             init 'JSON &1 "&2" under the "&3" array is not valid. The arrays in the "prods:before" section cannot have child &1s.'.
             
-       
         find ttBeforeSource where ttBeforeSource.name = phbuffer:name no-error.
         if not avail ttBeforeSource then
         do:
@@ -363,7 +363,7 @@ class Pmfo.Util.JsonReader:
         
                     end.
                     else if iJsonState <> row-modified then 
-                        undo, throw new IllegalStateError(subst('LoadBeforeImageFromJson called fpr json node with prods:rowState "&1"',BufferUtil:GetRowStateStringPast(iJsonState))) .
+                        undo, throw new IllegalStateError(subst('LoadBeforeImageFromJson called for json node with prods:rowState "&1"',BufferUtil:GetRowStateStringPast(iJsonState))) .
                     
                 end.      
                 else    
@@ -573,6 +573,7 @@ class Pmfo.Util.JsonReader:
         define variable lSkipRow as logical no-undo.
         define variable lChildHasNonEmptyValue as logical.
         define variable cParentConflictMsg as character no-undo.
+        define variable lSkipBeforeDeletes as logical no-undo.  
           
         if HasNextId then
         do:
@@ -587,7 +588,12 @@ class Pmfo.Util.JsonReader:
         
         if valid-object(BeforeImageJson) and valid-object(phparent) then 
         do:
-            LoadBeforeImageDeletesFromJson(phBuffer,phParentFields,pcChildFields).
+            if valid-object(JsonReadHandler) and type-of(JsonReadHandler,IJsonExtendedReadAndBeforeDeleteHandler) then 
+                lSkipBeforeDeletes = cast(JsonReadHandler,IJsonExtendedReadAndBeforeDeleteHandler)
+                     :LoadBeforeImageDeletesFromJson(BeforeImageJson, phbuffer, phParentFields, pcChildFields, this-object).
+            // allow ? and no as return 
+            if (lSkipBeforeDeletes = true) = false then         
+                LoadBeforeImageDeletesFromJson(phBuffer,phParentFields,pcChildFields).
         end.
         
         if pJsonArray:length > 0 then
@@ -614,7 +620,11 @@ class Pmfo.Util.JsonReader:
                         phBuffer:buffer-release().
                         next rowloop.
                     end.   
+                    catch eUnp as UnprocessableEntityError :
+                       undo, throw eUnp. 
+                    end catch.
                     catch e as Progress.Lang.Error :
+                        
                        // rethrow as unprocessable to avoid wrapping if nested     
                         undo,throw new UnprocessableEntityError(subst("Failed to read '&1' from json",phBuffer:serialize-name),e).
                     end catch.
@@ -700,7 +710,10 @@ class Pmfo.Util.JsonReader:
                         do: 
                             case pState: 
                                 when RowStateEnum:Created or when RowStateEnum:Action then
-                                    phBuffer:mark-row-state (row-created).
+                                do:
+                                    if valid-handle(phBuffer:table-handle:before-table) then
+                                       phBuffer:mark-row-state (row-created).
+                                end. 
                                 when RowStateEnum:Modified then
                                 do:
                                     if valid-object(BeforeImageJson) then
@@ -745,6 +758,13 @@ class Pmfo.Util.JsonReader:
                     catch e1 as ValidationError:
                         undo, throw e1.
                     end.    
+                    // allow readers to throw unprocecsable
+                    catch eUnpErr as UnprocessableEntityError:
+                        message "catch"
+                        view-as alert-box.
+                        undo, throw eUnpErr.
+                    end.    
+                    
                     // don't wrap unprocessable - or rethrow as unprocessable to avoid wrapping higher up 
                     catch e2 as ApplicationError :
                         if phBuffer:avail then
@@ -764,7 +784,8 @@ class Pmfo.Util.JsonReader:
                             // TODO  improve message to show key values ...
                             undo, throw new UnprocessableEntityError(subst("&1 object found with duplicate key values in node &2",phBuffer:serialize-name,i)).     
                         end.
-                         
+                         message "catch 3" e3:GetClass():Typename
+                         view-as alert-box.
                         undo,throw new ApplicationError(subst("Failed to read '&1' from json",phBuffer:serialize-name),e3).
                     end catch.
                 end.
@@ -898,8 +919,9 @@ class Pmfo.Util.JsonReader:
     end method.
     
     method protected char GetJsonValueWhenError (pJson as JsonObject,pName as char):
+       // define variable cValue as lonjchar no-undo.
         define variable cValue as character no-undo.
-        cValue = JsonUtil:GetStringValue(pJson, pName).
+       // cValue = JsonUtil:GetStringValue(pJson, pName).
         if cValue = ? then 
             cValue = "null".
         return cValue.    
@@ -1087,7 +1109,6 @@ class Pmfo.Util.JsonReader:
         do:                
             AssignField(pjson,phfld).
         end.
- 
     end.
     
     method protected logical IsModeAppend(pcmode as char):

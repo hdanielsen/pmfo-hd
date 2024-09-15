@@ -22,6 +22,8 @@ using Pmfo.Util.FileUtil from propath.
 using Pmfo.Util.StringUtil from propath.
 using Progress.Json.ObjectModel.JsonObject from propath.
 using Progress.Lang.Error from propath.
+using Pmfo.Core.BusinessLogic.IBusinessEntity from propath.
+using Pmfo.Core.BusinessLogic.IReceiveDataEventArgs from propath.
 
 class Pmfo.Repository.Business.PublicNameBE abstract inherits BusinessEntity: 
     &scop mode protected
@@ -67,12 +69,10 @@ class Pmfo.Repository.Business.PublicNameBE abstract inherits BusinessEntity:
 
     end method.
     
-    method override protected void ReceiveData( input pParent as Pmfo.Core.BusinessLogic.IBusinessEntity, input pReceiveDataArgs as Pmfo.Core.BusinessLogic.IReceiveDataEventArgs, input phDataset as handle ):
-        LoadData().
-    end method.
-    
+   
     method protected void LoadData():
         define variable oError as Error no-undo.
+        
         do on error undo, throw:
             dataset dsPublicName:read-json ("file",GetConfigFullPath(),"append").
             catch e as Progress.Lang.Error :
@@ -173,6 +173,10 @@ class Pmfo.Repository.Business.PublicNameBE abstract inherits BusinessEntity:
             return ttPropertyName.name.      
         return "".                   
     end method.     
+    
+    method protected override void BeforeReceiveData(input pReceiveDataArgs as IReceiveDataEventArgs, input phDataset as handle ):
+        LoadData(). 
+    end.
     
     method public override void Initialize():
         GetData().

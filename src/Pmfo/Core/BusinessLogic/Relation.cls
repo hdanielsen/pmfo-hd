@@ -116,7 +116,38 @@ class Pmfo.Core.BusinessLogic.Relation implements IRelation:
     define public property ParentKeys     as character     extent  no-undo get. 
     
     // See IRelation
-    define public property XRef           as logical        no-undo get. set.
+    define public property XRef           as logical        no-undo 
+       get. 
+       set(plXref as logical):
+           define variable cAlias as character no-undo.
+           define variable cMessage as character no-undo.
+           if plXref then
+           do:
+               
+               if AliasName = "" then 
+                   undo, throw new IllegalStateError("Cannot set XRef true when there is no AliasName").
+               
+               calias =  AliasName.
+               // the alia must exits and have correct casing for this to work
+               AliasName = AssertAndFixRelation(AliasName).
+               
+               if compare (cAlias,"<>",AliasName,"case-sensitive") and not session:remote then
+               do:
+                   cMessage =  subst("The XREF relation from '&1' to '&2' has AliasName '&3' with incorrect casing. It was corrected to '&4'.",
+                                ParentName,Name,cAlias,AliasName
+                                    ).
+                                    
+                  if session:remote = false then 
+                 //      message cMessage. 
+                 // else
+                   
+                   message cMessage
+                      view-as alert-box warning. 
+               end.
+               
+           end.
+           this-object:Xref = plXref.      
+       end.
       
     // keep track of the dynamic dataset currently created to manage requests
     // we could alternatively store the BE 
@@ -148,7 +179,12 @@ class Pmfo.Core.BusinessLogic.Relation implements IRelation:
     define public property JoinPredicates as IJoinPredicate no-undo extent  get. protected set. 
         
     define public    property ForeignKey     as character      no-undo get. protected set.
-    
+    // set at creation to tell link routers to call CreateDynamicBusinessEntity
+    // with parent buffer and this relation as context when starting the BE  
+    // The BE must implement IDynamicBusinessEntity
+    define public property IsDynamic      as logical no-undo get. set. 
+
+   
      
     define protected property OtherKey       as character      no-undo 
         get():
@@ -237,7 +273,8 @@ class Pmfo.Core.BusinessLogic.Relation implements IRelation:
         Assert:NotNullOrEmpty(pChild,"Foreign/child resource name").
         Assert:NotNullOrEmpty(pForeignKey,"Foreign key").
         ParentName      = pParent.
-        Name            = AssertAndFixRelation(pChild).  
+        Name            = AssertAndFixRelation(pChild).
+          
         ForeignKey      = pForeignKey.
         Cardinality     = RelationTypeEnum:ManyToOne. 
     end constructor.

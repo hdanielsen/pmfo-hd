@@ -214,7 +214,7 @@ class Pmfo.Util.DatasetUtil:
                    return hBuffer.   
             end.
         end.
-        undo, throw new IllegalArgumentError(subst("&1 out of range of actiive top buffers",pnum)).
+        undo, throw new IllegalArgumentError(subst("&1 is out of range of active top buffers",pnum)).
                  
     end method.
     
@@ -293,7 +293,6 @@ class Pmfo.Util.DatasetUtil:
     end method.
     
    
-    // return a comm separated list of deactivated child buffers 
     method public static handle GetRelation(pDataset as handle, pcParent as char, pcChild as char):
         define variable i          as integer   no-undo.
         define variable hRelation  as handle    no-undo.

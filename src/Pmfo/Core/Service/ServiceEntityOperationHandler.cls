@@ -185,8 +185,7 @@ class Pmfo.Core.Service.ServiceEntityOperationHandler inherits OperationHandler 
              
         // hook for subclasses
         ApplyServiceRequestProperties(oClientServiceRequest,pServiceEntity).
-        
-        // we are allowing parameters on POST as long as there is no body (if you need both use BusinessEntity to define the tt for the body)
+         // we are allowing parameters on POST as long as there is no body (if you need both use BusinessEntity to define the tt for the body)
         if pcMethod <> "GET" 
         and oClientServiceRequest:KeyWheres[extent(oClientServiceRequest:KeyWheres)] > "" 
         and pServiceEntity:AllowAction 
