@@ -52,6 +52,9 @@ interface Pmfo.Core.DataLayer.IFieldManager:
     // that has this a parameter so may in theory be used for other buffer than UpdateTarget BufferHandle   
     method public character WhereExpression(phDbBuffer as handle, pcSourcename as character).
     method public character BeforeWhereExpression(phDbBuffer as handle, pcSourcename as character).
-    method public logical   SaveRow(pUpdateTarget as IUpdateTarget,phBeforeBuffer as handle). 
+    method public logical   SaveRow(pUpdateTarget as IUpdateTarget,phBeforeBuffer as handle).
+    //optimistic lock compare ignore changes to IUpdateTargetOptimisticLockExceptFieldsfields 
     method public character CheckRow(pUpdateTarget as IUpdateTarget,phBeforeBuffer as handle).
+    //basic compare also IUpdateTargetOptimisticLockExceptFieldsfields marked as  
+    method public character CompareRow(pUpdateTarget as IUpdateTarget,phBeforeBuffer as handle).
 end interface.

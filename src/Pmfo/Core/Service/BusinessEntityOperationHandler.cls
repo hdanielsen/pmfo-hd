@@ -122,9 +122,9 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
   
      
     define protected property ServiceManager as IServiceManager no-undo 
-       get():
-            return cast(Application:ServiceManager,IServiceManager).
-       end.
+        get():
+           return cast(Application:ServiceManager,IServiceManager).
+        end.
          
     constructor public BusinessEntityOperationHandler (  ):
         super ().        
@@ -1300,7 +1300,15 @@ class Pmfo.Core.Service.BusinessEntityOperationHandler inherits OperationHandler
                             if cNextId > "" then
                             do:
                                 cQuery = BuildUrlQuery(oClientGetRequest:URIQuery,oClientGetRequest:ContextProperties).
-                                if oClientGetRequest:Skip > 0 or (oClientGetRequest:Count = true and oClientGetRequest:PagingContext = ?) then
+                                // use of skip means useNextPageLink
+                                if oClientGetRequest:Skip > 0 
+                                // count and no context means use useNextPageLink 
+                                or (oClientGetRequest:Count = true and oClientGetRequest:PagingContext = ?)
+                                // UserNextPageLink true means force use of NextPageLink when NextPagingContext is set  
+                                or (type-of(oGetDataTableResponse,Pmfo.Core.BusinessLogic.IGetDataTableResponse)
+                                    and
+                                    cast(oGetDataTableResponse,Pmfo.Core.BusinessLogic.IGetDataTableResponse):UseNextPageLink
+                                    ) then 
                                 do:
                                     cNextLinkName = subst(NextPageLinkTemplate,hRequestedBuffer:serialize-name).
                                     cQuery = cQuery + (if cQuery = "" then "?" else "&")

@@ -22,6 +22,7 @@ using Pmfo.Core.Manager.Manager from propath.
 using Progress.ApplicationServer.AdapterTypes from propath.
 using Progress.Json.ObjectModel.JsonObject from propath.
 using OpenEdge.Core.DateTimeAddIntervalEnum from propath.
+ 
 
 class Pmfo.Core.Manager.SessionManager inherits Manager implements ISessionManager : 
     
@@ -42,11 +43,9 @@ class Pmfo.Core.Manager.SessionManager inherits Manager implements ISessionManag
     get. 
     set. 
     
-    define property LastInterval as datetime no-undo get. set. 
-    
-    // Thse are textual values not inntended for logic other than logging 
+    // Thse are textual values not intended for logic other than logging 
     // including assignment of table fields that keep track of user stuff 
-    // subclasses should set for nmore detailed info like for example "Mobile" 
+    // subclasses should set for more detailed info like for example "Mobile" 
     define public property ClientType  as character no-undo 
         get():
             if ClientType = "" then
@@ -72,6 +71,8 @@ class Pmfo.Core.Manager.SessionManager inherits Manager implements ISessionManag
             return ClientType.    
         end.     
         protected set.
+    
+    define protected property SESSION_CONFIG_FILE_NAME as character init "session.json" no-undo get.
     
     method public void endRequestEnvironment(  ):
         undo, throw new NotImplementedError().
@@ -104,23 +105,15 @@ class Pmfo.Core.Manager.SessionManager inherits Manager implements ISessionManag
      
     method protected void ImportConfig(  ):
         define variable oJson as JsonObject no-undo.
-        oJson   = LoadConfig("session.json").
+        oJson   = LoadConfig(SESSION_CONFIG_FILE_NAME).
         QueryTimeout = oJson:GetInteger("QueryTimeout").
+        ImportConfig(oJson).
         return.
     end method.  
     
-    method void LogInterval(pctext as character).
-        define variable dt as datetime no-undo.
-        dt = now.
-        if session:remote then
-        message subst("Log Interval: &1 &2",
-                      pcText,
-                      if LastInterval = ? then 0 else interval(dt,LastInterval,DateTimeAddIntervalEnum:Milliseconds:ToString())) 
-        .
-        LastInterval = dt.
-    end method. 
+    // allow sub class to read other properties
+    method protected void ImportConfig(pJson as JsonObject):
+    end method.    
     
-    method void ResetLogInterval().
-        LastInterval = ?.
-    end method.  
+    
 end class.

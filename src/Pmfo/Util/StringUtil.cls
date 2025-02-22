@@ -140,6 +140,34 @@ class Pmfo.Util.StringUtil:
         return "".
     end method.    
     
+    /* return the first entry of a paired list if the name is first of the pair
+       return blank if not found 
+    */
+    method public static character GetFirstMappedNameOfPair(pcName as char,pcNameMap as longchar):
+        define variable iLookup as integer no-undo.
+        define variable cSearch as character no-undo.
+        define variable i       as integer no-undo.
+        
+        iLookup = lookup(pcName,pcNameMap). 
+        if iLookup > 1 then 
+        do:
+            // if we find a name in the wrong place then loop through the rest of entries to see if there is a correct match
+            // (it would be more efficient to cut the list and do antoher lookup..) 
+            if iLookup modulo 2 = 1 then do: 
+                do i = iLookup to num-entries(pcNameMap) by 2:
+                    if entry(i,pcNameMap) = pcName then 
+                    do:
+                        return string(entry(i - 1,pcNameMap)).
+                    end.    
+                end.
+            end.
+            else do:
+                return string(entry(iLookup - 1,pcNameMap)).  
+            end.        
+        end.
+        return "".
+    end method.    
+    
     /* return the second entry of a paired list if the name is the first of the pair
        return the original name if not found */
     method public static character GetUseName(pcName as char,pcNameMap as char):
@@ -624,6 +652,10 @@ class Pmfo.Util.StringUtil:
       
     method public static character AppendEntry(pcString as character,piAppend as integer): 
         return AppendEntry(pcString,string(piAppend)). 
+    end method.
+    
+    method public static character AppendEntry(pcString as character,pdAppend as decimal): 
+        return AppendEntry(pcString,string(pdAppend)). 
     end method.
     
     method public static character AppendEntry(pcString as character,pcAppend as character,pcdlm as character): 

@@ -127,6 +127,7 @@ class Pmfo.Core.Common.MimeTypes implements IMimeTypes:
         ImageMap:put("video/quicktime","mov").
         ImageMap:put("video/x-msvideo","avi").
         ImageMap:put("video/x-ms-wmv","wmv").
+        ImageMap:put("application/octet-stream","msg").
     end method.
     
     method public void Destroy().

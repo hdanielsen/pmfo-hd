@@ -98,6 +98,8 @@ using Pmfo.Core.BusinessLogic.Delegate.ValidateDelegate from propath.
 using Pmfo.Core.BusinessLogic.IDynamicBusinessEntity from propath.
 using Pmfo.Core.Error.IllegalOperationError from propath.
 using Pmfo.Core.BusinessLogic.IRelation from propath.
+using Pmfo.Core.Common.IPasswordRules from propath.
+using Pmfo.Util.IMemoryLogger from propath.
 
 // There are tow different canFind implementaions. 
 // One that uses can-find and one that uses find sonce can-find is faster we want 
@@ -281,6 +283,15 @@ class Pmfo.Core.Manager.ServiceManager inherits Manager implements IServiceManag
            return  FetchFunctionDelegate.    
        end.
        set.
+       
+    define protected property MemoryLogger  as IMemoryLogger no-undo 
+       get():
+           // keep alive for the entire session
+           if not valid-object(MemoryLogger) then 
+               MemoryLogger = CreateMemoryLogger().
+           return MemoryLogger.   
+       end.
+       set. 
      
     // not in interface as of current - override in subclass initialize
     define public property CodeTableKeyType as character init "character" no-undo 
@@ -458,7 +469,7 @@ class Pmfo.Core.Manager.ServiceManager inherits Manager implements IServiceManag
         else 
             undo, throw new ApplicationError(subst("Business Entity '&1' does not exist",pcname)). 
     end method.
-   
+    
     
     method public IServiceEntity CreateServiceEntity( input pcName as character ):
         return cast(CreateEntity(pcName,false,false,?,get-class(IServiceEntity)),IServiceEntity).    
@@ -957,8 +968,14 @@ class Pmfo.Core.Manager.ServiceManager inherits Manager implements IServiceManag
             do:
                 return ValidateDelegate. // singleton - initialized in getter
             end.
-            
-            
+            when get-class(IPasswordRules) then
+            do:
+                return CreatePasswordRules(). 
+            end.
+            when get-class(IMemoryLogger) then
+            do:
+                return MemoryLogger.
+            end.
             otherwise        
                 undo, throw new NotImplementedError(subst("GetService (Class &1)",poService:TypeName)).
         end.
@@ -972,6 +989,10 @@ class Pmfo.Core.Manager.ServiceManager inherits Manager implements IServiceManag
         
     end method.
     
+    // no default
+    method protected IPasswordRules CreatePasswordRules():
+        undo, throw new NotImplementedError("PasswordRules Utility").
+    end.     
     //  allpw pverride by subclass
     method protected IDatasetGetManager CreateDatasetGetManager():
         return new DatasetGetManager().
@@ -1021,11 +1042,7 @@ class Pmfo.Core.Manager.ServiceManager inherits Manager implements IServiceManag
                 when get-class(IDatasetUpdateManager) then
                 do:
                     oService = new DatasetUpdateManager().
-                end.
-/*                when get-class(IValidationFindService) then      */
-/*                do:                                              */
-/*                    oService = GetValidationFindService(hHandle).*/
-/*                end.                                             */
+                end.                                    
                 otherwise
                     undo, throw new NotImplementedError(subst("GetService (Class &1), ILifecycleScope",poService:TypeName)).
             end case.
@@ -1238,6 +1255,12 @@ class Pmfo.Core.Manager.ServiceManager inherits Manager implements IServiceManag
     // allow subclasses to override    
     method protected Progress.Lang.Class GetCatalogOperationHandlerClass():  
         return get-class(CatalogOperationHandler).
+    end method. 
+    
+    // subclasses must to override to use this    
+    method protected IMemoryLogger CreateMemoryLogger():
+        message "ERROR: Attempt to start MemoryLeakLogger in Application where it is not implemented."
+        view-as alert-box. 
     end method. 
      
     method protected void LoadResources():

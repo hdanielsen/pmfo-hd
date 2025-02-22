@@ -16,4 +16,6 @@ using OpenEdge.Core.Collections.ICollection from propath.
 interface Pmfo.Core.BusinessLogic.IGetDataTableResponse inherits IGetDataTableResponse,IGetTableResultCountResponse:  
     define public property Public           as logical no-undo get. set.  
     define public property TrimExtentFields as character no-undo get. set.  
+       // force return of  nextPageLink as context for NextPagingContext 
+    define public property UseNextPageLink       as logical no-undo get. set.  
 end interface.

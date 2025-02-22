@@ -27,6 +27,7 @@ using Progress.Json.ObjectModel.JsonObject from propath.
 using Progress.Lang.AppError from propath.
 using Progress.Lang.Error from propath.
 using Pmfo.Core.Error.NotFoundError from propath.
+using Pmfo.Core.Error.QuestionError from propath.
 
 class Pmfo.Core.Service.JsonDatasetErrorProcessor: 
     
@@ -382,6 +383,30 @@ class Pmfo.Core.Service.JsonDatasetErrorProcessor:
             end.
         end.
       
+    end method. 
+       
+    method public Error CreateQuestionError(pQuestionError as QuestionError):
+        return CreateQuestionError(pQuestionError:EntityName,pQuestionError:QuestionId,pQuestionError:Question).   
+    end method.
+    
+    method public Error CreateQuestionError(pcEntity as character,pcQuestionid as integer,pcMessage as character):
+        define variable iMsg       as integer no-undo.
+        define variable cFields    as character extent no-undo.
+        define variable cTypes     as character extent no-undo.
+        define variable iIds       as integer  extent no-undo.
+        define variable cMessages  as character extent no-undo.
+        define variable oJson      as JsonObject no-undo.
+        define variable iNum       as integer no-undo.
+        define variable clong      as longchar no-undo.
+     
+        ojson = new JsonObject().
+        oJson:Add("errorType","Question").
+        oJson:Add("errorMsg",pcMessage).
+        oJson:Add("entity",pcEntity).
+        oJson:Add("errorNum",pcQuestionid).
+        oJson:Write(cLong).
+        this-object:Error = new ClientDataError(string(cLong),iNum). 
+        return this-object:Error.
     end method.    
     
     method public void  LoadErrors(pjson as JsonObject):

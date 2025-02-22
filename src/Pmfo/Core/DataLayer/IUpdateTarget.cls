@@ -17,6 +17,8 @@ using Progress.Lang.ParameterList from propath.
 using Progress.Reflect.Method from propath.
 
 interface Pmfo.Core.DataLayer.IUpdateTarget inherits IDataSource:  
+    define public property OptimisticLockExceptFields as character no-undo get. 
+  
     /* Prepare by attaching the data source to the DataSourceHandle 
     */  
    // method public logical PrepareSave(phBuffer as handle).

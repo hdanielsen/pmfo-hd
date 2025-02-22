@@ -87,6 +87,7 @@ using Pmfo.Core.Common.IFieldValue from propath.
 using Pmfo.Core.Common.FieldValue from propath.
 using Pmfo.Core.Common.Key from propath.
  
+ 
 
 class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdateTarget:
     /** See GetRecordCheckSum
@@ -102,8 +103,8 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
     // set to true to avoid lobs in save row changes (i.e. when images are stored to disk)
     define protected property NoLobs             as logical   no-undo get. protected set.
     
-    // set for feidls that is not supposed to be optimitic locked checked or saved automatically
-    define protected property SaveExceptFields   as character init ? no-undo get. protected set.
+    // set for fields that are not supposed to be optimistic locked checked or saved automatically
+    define public property OptimisticLockExceptFields   as character init ? no-undo get. protected set.
     
     define protected property ConfirmedQuestions as character no-undo get. set.
     
@@ -767,6 +768,10 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
       
     // allow subclasses to override and do nothing 
     method protected void HandleQueryError (pRequest as IGetDataTableRequest, pError as Error):
+        //  columnExpression may throw not implemented for some fields - filter on outer-join buffer 
+        if type-of(pError,NotImplementedError) then
+            undo, throw new ApplicationError(subst("Cannot build database query. &1. Please Contact IT.",cast(pError,ApplicationError):GetStrippedmessage()),pError).
+         
         undo, throw new ApplicationError(subst("Failed to build database query from query '&1'",pRequest:QueryString),pError).  
     end method.
     
@@ -869,7 +874,7 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
       
         // referenced table parents must be included - this ensures the list is ordered 
         // with parents first 
-        
+     
         do iTempTable = 1 to num-entries(pcInnerJoinTables):
             hBuffer = phDataset:get-buffer-handle(entry(iTempTable,pcInnerJoinTables)).
             cOtherTables = GetParentNames(hBuffer,DataBuffer).
@@ -898,8 +903,9 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                 hTempTableBuffers[iTempTable + 1] = phdataset:get-buffer-handle(entry(iTemptable,cAllJoinedTables)).
             end.    
         end. 
-        else 
+        else do:
             hTempTableBuffers = OrderBuffersForInnerJoin(cast(pRequest,Pmfo.Core.BusinessLogic.IGetDataTableRequest), cAllJoinedTables, phDataset).
+        end.
         
         lInnerJoinOptimized = hTempTableBuffers[1] <> DataBuffer.
          
@@ -934,7 +940,7 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                         cAddQuery = cTableQueries[iDbBuffer].
                         cBufferName = oDataSources[iTempTable]:BufferHandles[iDbBuffer]:name.
                     end.
-                     
+                    
                     if cBufferName > "" then 
                     do:
                         if iDBBuffer > 1 and cRenameList > "" then 
@@ -951,7 +957,6 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                         /*                                                             */
                         /*                                                             */
                         /*                        end.                                 */
-                        
                         do while lookup(cName,BufferNames) > 0 or lookup(cName,cNewNames) > 0:
                             iRename = iRename + 1.
                             cName = subst("&1_&2",cBufferName,iRename).
@@ -973,6 +978,9 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                         create buffer hBuffer for table oDataSources[iTempTable]:BufferHandles[iDBbuffer]:table buffer-name cname.
                         
                         oHandles:Add(new WidgetHandle(hBuffer)).
+                        cNewNames = cNewNames 
+                                  + (if cNewNames = "" then "" else ",")
+                                  + hBuffer:name.
                                         
                         if iDbBuffer = 1 then
                         do:
@@ -986,6 +994,7 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                 do:
                     if not valid-object(oTableBufferRenameMap) then 
                         oTableBufferRenameMap = new StringStringMap().
+                        
                     oTableBufferRenameMap:put(hTempTablebuffers[iTempTable]:name,cRenameList).
                 end.  
             end.
@@ -1014,10 +1023,8 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                     iLastinnerJoinMainTable = iStartMainOuterJoinTables - 1.
                 else     
                     iLastinnerJoinMainTable = extent(BufferHandles).
-                    
                 if iTempTable > 1 then 
                 do: 
-                    
                     if entry(1,BufferNames) <> BufferName then 
                     do:
                         cJoinToChildAsParent = GetInnerJoinExpressionForOtherBuffer( oDataSources[1]:BufferHandles[1]:name,entry(1,BufferNames)) .
@@ -1028,8 +1035,8 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                             // but this becomes complicated when two tables are moved before the main table as we would need to join
                             // the two top tables to ensure the second has FIRST and a where clause that possibly joins them in a menaingful way
                             // (keep in mind that they may be the same physical table -  as of current ) 
-                            // Whenever encountered the best fix is likely to ensure GetBufferHandles only moves bufferhandles when 
-                            // there is no inner join pRequest:GetInnerJoins() = ""    
+                            // Whenever encountered the best fix is likely to ensure GetBufferHandles in the DataSource only moves 
+                            // bufferhandles when there is no inner join pRequest:GetInnerJoins() = ""    
                             undo, throw new UnsupportedOperationError
                                 (subst("The '&1' Entity Buffers and BaseQuery is run-time optimized to define '&2' as the first database buffer instead of the main '&3' database buffer."
                                 + " This may conflict with the runtime optimization for the inner join for the expanded tables that has moved database buffer '&4' from the '&5' entity as the first buffer in the inner join query."
@@ -1044,7 +1051,7 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                     end.
                     // iLastinnerJoinMainTable is less than extent(Bufferhqandles) if we need to skip outerjoin tables here (will beadded afcter this)     
                     do iBuffer = 1 to iLastinnerJoinMainTable:
-                        if iBuffer = 1 then
+                        if iBuffer = 1 then // remove 'each' or 'first' 
                             cInnerJoinQuery =  left-trim(subst("&1, &2",cInnerJoinQuery,left-trim(substr(cMainBaseQueries[iBuffer],4)))," ,").
                         else     
                             cInnerJoinQuery =  left-trim(subst("&1, &2",cInnerJoinQuery,cMainBaseQueries[iBuffer])).
@@ -1062,7 +1069,8 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                 
             end.    
         end. 
-        // add any outer joins found at end
+        
+       // add any outer joins found at end
         if iStartMainOuterJoinTables > 0 then
         do: 
             do iBufferHandle = iStartMainOuterJoinTables to extent(BufferHandles):
@@ -1072,9 +1080,10 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         end.
     
         lMainJoinAdded =  hTempTablebuffers[1] = DataBuffer.
-         
+        define variable iParent as integer no-undo. 
         // add joins to innerjoin buffers   
-        do iTempTable = 2 to extent(hTempTableBuffers): 
+        do iTempTable = 2 to extent(hTempTableBuffers):
+            
             hRelation = ?.
             lChildisparent = false.
           
@@ -1086,26 +1095,25 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                         BufferHandles[1]:Name,
                         cInnerJoinQuery, 
                         cJoinToChildAsParent).
-                    
-                end.    
+                end.
                 else do:
+                    hRelation = ?.
                     relationloop:
+                        
                     do iRelation = 1 to Databuffer:num-child-relations:
-                        do iJoinTable = 1 to ITempTable - 1:
-                             
-                            if DataBuffer:get-child-relation(iRelation):child-buffer = hTempTablebuffers[iJoinTable] then
+                        // find the child in buffers before this
+                        do iParent = iTempTable - 1 to 1 by -1: 
+                            if DataBuffer:get-child-relation(iRelation):child-buffer = hTempTablebuffers[iParent] then
                             do:
                                 hRelation = DataBuffer:get-child-relation(iRelation).
-                                lChildisparent = true.
-                                leave.
-                            end.  
+                                leave relationloop.
+                            end.    
                         end.  
                     end.
-                  
-                    if lChildIsParent then 
+                    if valid-handle(hRelation) then 
                     do:
                         cNewWhere = GetInnerJoinExpression(oDataSourceMap,hRelation, oTableBufferMap,true).
-                        
+                    
                         cInnerJoinQuery = QueryUtil:InsertQueryExpression(
                             BufferName,
                             cInnerJoinQuery, 
@@ -1121,6 +1129,7 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                     relationloop: 
                     do iRelation = 1 to hTempTablebuffers[iTempTable]:num-child-relations:
                         hRelation  = hTempTablebuffers[iTempTable]:get-child-relation (iRelation).
+                        
                         if hRelation:child-buffer =  hTempTablebuffers[iTempTable - 1] then
                         do:
                             cNewWhere = GetInnerJoinExpression(oDataSourceMap,hRelation, oTableBufferMap,true).
@@ -1135,10 +1144,8 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                 else do:
                     hRelation = hTempTableBuffers[iTemptable]:parent-relation.
                     cNewWhere = GetInnerJoinExpression(oDataSourceMap,hRelation, oTableBufferMap,false).
-         
                     cInnerJoinQuery = QueryUtil:InsertQueryExpression(
                         string(oTableBufferMap:Get(hTempTableBuffers[iTemptable]:name)),
-                                        
                         cInnerJoinQuery, 
                         cNewWhere).
                 end.  
@@ -1170,7 +1177,7 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         // allow the instance to utilize the other sources to add or remove stugff from te final request 
         // NOTE the innerjoinquery cannot be changed only the request - before it is applied below  
         PrepareInnerJoinRequest(pRequest, pcInnerJoinTables, phdataset).
-        
+       
         // build the query from the request using the DataSourceInnerJoinMap wwhich resolves and redirects 
         // innerjoin qualified fields to the respective DataSource dealing with possible renaming   
         do on error undo, throw :
@@ -1194,7 +1201,9 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
             
         if valid-object(pParentRequest) then    
             cInnerJoinQuery = AddParentJoinToQuery(cInnerJoinQuery).   
-         
+        
+/*        message replace(cInnerJoinQuery,",","~n")*/
+/*         view-as alert-box.                      */
         QueryHandle:query-prepare(cInnerJoinQuery).
         
         return true. 
@@ -1231,9 +1240,13 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         define variable iExtent        as integer no-undo.
         define variable hParent        as handle no-undo.
         define variable iParent        as integer no-undo.
+        define variable cBuffers       as character no-undo.
+        
         // add an extent since this-object DataBuffer is not in the list
         extent(hBuffers) = num-entries(pJoinTables) + 1.
+        
         hBuffers[1] = GetFirstBufferForInnerJoin(pRequest, pJoinTables, phDataset).
+        
         if not valid-handle(hBuffers[1]) then  
             undo, throw new IllegalStateError("GetFirstBufferForInnerJoin returned an invalid handle. Please Contact IT").
         
@@ -1244,31 +1257,35 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
             end.    
         end.
         else do:
-            
-            if lookup(hBuffers[1]:name,pJoinTables) = 0 then  
-                undo, throw new IllegalStateError(subst("GetFirstBufferForInnerJoin returned buffer &1 which is not one of the inner join buffers in the dataset. Please Contact IT",hBuffers[1]:name)).
             iExtent = 1.
+            CBuffers = hBuffers[1]:name.
+            // add all buffers found following parent links from the buffer that is first   
             do while true on error undo, throw:
                 iExtent = iExtent + 1. 
                 if valid-handle(hBuffers[iExtent - 1]:parent-relation) then
                 do:
                     hBuffers[iExtent] = hBuffers[iExtent - 1]:parent-relation:parent-buffer.
+                    cBuffers = StringUtil:AppendEntry(cBuffers,hBuffers[iextent]:name).
                     if hBuffers[iExtent] = DataBuffer then leave.
                 end.
                 else 
                     undo, throw new IllegalStateError(subst("Buffer &1 encountered while traversing parent relation ships for buffer returned from GetFirstBufferForInnerJoin. Please Contact IT",hBuffers[iExtent - 1]:name)).
             end.
             
-            do i = iExtent to extent(hBuffers):
-                hBuffer = phDataset:get-buffer-handle(entry(i - 1,pJoinTables)).
-                
-                if hBuffer <> hBuffers[1] then 
-                do:  
+            // add all buffers not added above
+            do i = 1 to num-entries(pJointables):
+               
+                if lookup(entry(i,pJoinTables),cBuffers) = 0 then
+                do: 
                     iExtent = iExtent + 1.
-                    hBuffers[iExtent] = hBuffer.
+                    hBuffers[iExtent] = phDataset:get-buffer-handle(entry(i,pJoinTables)).
+                     cBuffers = StringUtil:AppendEntry(cBuffers,hBuffers[iextent]:name).
                 end.
             end.
+            
+      
         end.
+       
         return hBuffers.
          
     end method.     
@@ -2164,7 +2181,7 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
     method protected logical HasCurrentRowChanged(pcFields as character).
         define variable hBefore as handle no-undo.
         hBefore = BufferUtil:AssertAndGetBeforebuffer(DataBuffer).
-        return CompareBufferWithDb(hBefore,pcFields) > "".   
+        return CompareBufferWithDb(hBefore,pcFields,true) > "".   
     end method.
     
     method protected logical HasCurrentRowChanged().
@@ -2177,47 +2194,49 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
     method protected character CompareBufferWithDb(phBuffer as handle):
         define variable hDummy1 as handle extent no-undo.
         define variable hDummy2 as handle extent no-undo.
-        
-        return CompareBufferWithDb(phBuffer,"",output hdummy1, output hDummy2). 
+        // pass no to honor OptimisticLockExceptFields for regualr comparison
+        return CompareBufferWithDb(phBuffer,"",no,output hdummy1, output hDummy2). 
     end method.
     
-    method protected character CompareBufferWithDb(phBuffer as handle, pcFields as character):
+    method protected character CompareBufferWithDb(phBuffer as handle, pcFields as character,plHonorExceptFields as logical):
         define variable hDummy1 as handle extent no-undo.
         define variable hDummy2 as handle extent no-undo.
         
-        return CompareBufferWithDb(phBuffer,pcfields,output hdummy1, output hDummy2). 
+        return CompareBufferWithDb(phBuffer,pcfields,plHonorExceptFields,output hdummy1, output hDummy2). 
     end method.
     
-    method protected character CompareBufferWithDb(phBuffer as handle,pcfields as character, output phDataFields as handle extent, output phSourceFields as handle extent ):
-        define variable cFieldMaps     as character extent no-undo.
-        define variable cExceptLists   as character extent no-undo.
-        define variable i              as integer          no-undo.
-        define variable cHiddenFields  as character no-undo.
-        define variable cLobs          as character no-undo.
-        define variable iLob           as integer no-undo.
-        define variable cLobField      as character no-undo.
-        define variable cChanges       as character no-undo.
-        define variable cBufferChanges as character no-undo.
-        define variable cProxyChanges  as character no-undo.
-        define variable hBeforebuffer  as handle no-undo.
-        define variable hDatafields    as handle extent no-undo.
-        define variable hSourcefields  as handle extent no-undo.
+    method protected character CompareBufferWithDb(phBuffer as handle,pcfields as character, plHonorExceptFields as logical, output phDataFields as handle extent, output phSourceFields as handle extent ):
+        define variable cFieldMaps        as character extent no-undo.
+        define variable cExceptLists      as character extent no-undo.
+        define variable i                 as integer          no-undo.
+        define variable cHiddenFields     as character no-undo.
+        define variable cLobs             as character no-undo.
+        define variable iLob              as integer no-undo.
+        define variable cLobField         as character no-undo.
+        define variable cChanges          as character no-undo.
+        define variable cBufferChanges    as character no-undo.
+        define variable cProxyChanges     as character no-undo.
+        define variable hBeforebuffer     as handle no-undo.
+        define variable hDatafields       as handle extent no-undo.
+        define variable hSourcefields     as handle extent no-undo.
         define variable hDatafieldsWork   as handle extent no-undo.
         define variable hSourcefieldswork as handle extent no-undo.
-        define variable cMetricChanges   as character no-undo.
-        
+        define variable cMetricChanges    as character no-undo.
+        define variable cExceptFields     as character no-undo.
         if not phBuffer:avail then
             undo, throw new IllegalStateError(subst("Buffer '&1' is not available",phBuffer:name)).
       
         if not BufferHandle:avail then
             undo, throw new IllegalStateError(subst("Database table '&1' is not available",BufferHandle:name)).
-        
         // @TODO - test and fix the following 
         // the field maps is likely not necessary since buffer compare uses the attach field map if 
         // one buffer is dataset buffer and the other is datasource buffer 
         
         SplitFieldMap(FieldMap, output cFieldMaps,output cExceptLists).        
         cHiddenFields = BufferUtil:GetHiddenFields(phBuffer).
+        if plHonorExceptFields then 
+            cExceptFields = OptimisticLockExceptFields.
+        
         if NoLobs then 
             cLobs = GetLobFields().  
         
@@ -2225,6 +2244,8 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
             if BufferHandle = BufferHandles[i] then
             do: 
                 cExceptLists[i] = trim(cExceptLists[i] + "," + cHiddenFields,",").
+                if cExceptFields > "" then
+                   cExceptLists[i] = trim(cExceptLists[i] + "," + cExceptFields,",").
                 if NoLobs and cLobs > "" then 
                 do iLob = 1 to num-entries(cLobs): 
                     cLobField = entry(iLob,cLobs).
@@ -2234,7 +2255,7 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                             + cLobField.
                 end.
                      
-                if phBuffer:buffer-compare(BufferHandle,"case-sensitive",? ,cFieldMaps[i]) = false then
+                if phBuffer:buffer-compare(BufferHandle,"case-sensitive",cExceptLists[i] ,cFieldMaps[i]) = false then
                 do:
                     extent(hDataFields) = ?.
                     extent(hSourceFields) = ?.
@@ -2269,8 +2290,11 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         end.
         if valid-object(ProxyManager) then
         do:
-             
-            cProxyChanges = ProxyManager:CheckRow(this-object,phbuffer).
+            if plHonorExceptFields then 
+                cProxyChanges = ProxyManager:CheckRow(this-object,phbuffer).
+            else
+                cProxyChanges = ProxyManager:CompareRow(this-object,phbuffer).
+            
             if cProxyChanges > "" then 
             do:
                 /*                if cChanges > "" and extent(hDataFields) > 1 then                                   */
@@ -2300,11 +2324,14 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         end.
         if valid-object(FieldSaveManager) then 
         do:
+            if plHonorExceptFields then 
+                cMetricChanges = FieldSaveManager:CheckRow(this-object, phbuffer).   
+            else
+                cMetricChanges = FieldSaveManager:CompareRow(this-object, phbuffer).   
             
-            cMetricChanges = FieldSaveManager:CheckRow(this-object, phbuffer).   
             if cMetricChanges > "" then 
                 cChanges = left-trim(subst("&1,&2",cChanges,cMetricChanges),",").
-              
+    
         end.    
         return cChanges.  
     end method.
@@ -3123,7 +3150,7 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         define variable cProxyColumn as character no-undo.
         define variable cColumnName as character no-undo.
         define variable cMappedName as character no-undo.
-        
+     
         /*  inner join reference to other buffers can be passed from client,
             so we use the buffer's dataset to get those datasources' 
             fieldmap. This assume that any buffer that has been attached to a 
@@ -3517,7 +3544,7 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
         else 
             undo, throw new IllegalStateError(subst("Buffer '&1' is not a valid buffer reference for DataSource '&2'",phBuffer:name,EntityName)).
         FindSource(phbuffer, BufferHandle, exclusive-lock).
-        pcChanges = CompareBufferWithDb(phbuffer,pcfields).
+        pcChanges = CompareBufferWithDb(phbuffer,pcfields,true).
         
         return pcChanges > "".  
     end method.
@@ -3534,7 +3561,7 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
             hBuffer = DataBuffer:before-buffer.
         else 
             hbuffer = DataBuffer.    
-        cChanges = CompareBufferWithDb(hbuffer,pcfields).
+        cChanges = CompareBufferWithDb(hbuffer,pcfields,true).
         if cChanges > "" then 
             undo, throw new ConflictError(hbuffer).      
     end method.    
@@ -3585,7 +3612,7 @@ class Pmfo.Core.DataLayer.DataSource abstract inherits DbQuery implements IUpdat
                         Databuffer:find-by-rowid (phBeforeBuffer:after-rowid).
                         FindSources(exclusive-lock).
                     
-                        cChanges = CompareBufferWithDb(phBeforeBuffer, "", output hDataFields, output hSourceFields).
+                        cChanges = CompareBufferWithDb(phBeforeBuffer, "",true, output hDataFields, output hSourceFields).
                     
                         if cChanges > "" then 
                             StringUtil:AppendEntry(pcChanges, cChanges). 

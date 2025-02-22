@@ -143,7 +143,7 @@ class Pmfo.Core.DataLayer.Update.SourceFieldManager implements IFieldManager:
     // get next valie. Doing this when the recor is being creared flushes the buffer and causes
     // error if this key is mandatory or needed to make the record unique
     // TODO: future if proxies that not are constants also needs this step, which is very possible
-    //  then we will add ew methods for this in the common IFieldManager interfase and change this to that
+    //  then we will add new methods for this in the common IFieldManager interface and change this to that
     //  and add notsupported or not implemented heren    
     method public character CheckRow(pUpdateTarget as IUpdateTarget,phBeforeBuffer as handle):
         define variable oIterator   as IIterator    no-undo.
@@ -156,7 +156,11 @@ class Pmfo.Core.DataLayer.Update.SourceFieldManager implements IFieldManager:
             if type-of(oField,IHiddenSourceKey) then 
                 PrepareProxy(cast(oField,IHiddenSourceKey),pUpdateTarget:BufferNames,pUpdateTarget:BufferHandles).   
         end.      
-    end method.     
+    end method.   
+    // no difference here  
+    method public character CompareRow(pUpdateTarget as IUpdateTarget,phBeforeBuffer as handle):
+        return CheckRow(pUpdateTarget,phBeforeBuffer).
+    end method.
     
     method public logical SaveRow(pUpdateTarget as IUpdateTarget,phBeforeBuffer as handle): 
         define variable oIterator   as IIterator   no-undo.

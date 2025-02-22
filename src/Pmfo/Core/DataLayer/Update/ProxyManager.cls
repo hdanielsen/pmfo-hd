@@ -239,12 +239,20 @@ class Pmfo.Core.DataLayer.Update.ProxyManager implements IFieldManager:
         end.    
     end method. 
     
+    method public character CompareRow(pUpdateTarget as IUpdateTarget, phBuffer as handle): 
+        return CompareRow(pUpdateTarget, phBuffer,"").
+    end method. 
+    
     method public character CheckRow(pUpdateTarget as IUpdateTarget, phBuffer as handle): 
+        return CompareRow(pUpdateTarget, phBuffer,pUpdateTarget:OptimisticLockExceptFields).
+    end method.      
+    
+    method protected character CompareRow(pUpdateTarget as IUpdateTarget, phBuffer as handle, pcExceptFields as character): 
         define variable oIterator    as IIterator   no-undo.
         define variable oFieldProxy  as IFieldProxy no-undo. 
         define variable cChanges     as character   no-undo.
         define variable lChanged     as logical     no-undo.
- 
+      
         if not valid-handle(phBuffer) then
             undo, throw  new IllegalArgumentError("Buffer is null").
         
@@ -254,12 +262,17 @@ class Pmfo.Core.DataLayer.Update.ProxyManager implements IFieldManager:
             oIterator = ProxyFields:Iterator().
             // the list is typcially small so the assumption is that a collection loop is cheaper than a map  
             do while(oIterator:HasNext()):
-                ofieldProxy = cast(oIterator:Next(),IfieldProxy).
-                lChanged = oFieldProxy:Conflict().
-                if lChanged then
-                   cChanges = cChanges  
-                            + (if cchanges = "" then "" else ",")
-                            + ofieldProxy:Field:name. 
+                ofieldProxy = cast(oIterator:Next(),IFieldProxy).
+                if pcExceptFields = ? 
+                or pcExceptFields = "" 
+                or lookup(oFieldProxy:Field:name,pcExceptFields) = 0 then
+                do: 
+                    lChanged = oFieldProxy:Conflict().
+                    if lChanged then
+                       cChanges = cChanges  
+                                + (if cchanges = "" then "" else ",")
+                                + ofieldProxy:Field:name. 
+                end.            
             end.    
         end.
         
@@ -301,7 +314,7 @@ class Pmfo.Core.DataLayer.Update.ProxyManager implements IFieldManager:
             // the list is typcially small so the assumption is that a collection loop is cheaper than a map  
             do while(oIterator:HasNext()):
                 ofieldProxy = cast(oIterator:Next(),IfieldProxy).
-                if phBeforebuffer:row-state = row-created or oFieldProxy:Field:buffer-value <> oFieldProxy:BeforeField:buffer-value then 
+                if oFieldProxy:NeedsSave() then 
                     oFieldProxy:Save().  
             end.   
         end.    

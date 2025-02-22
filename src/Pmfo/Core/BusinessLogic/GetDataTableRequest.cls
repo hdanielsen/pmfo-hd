@@ -53,18 +53,24 @@ class Pmfo.Core.BusinessLogic.GetDataTableRequest implements IGetDataTableReques
     define public property QueryDefinition as IQueryDefinition no-undo get. set. 
          
     /* Returns the number of records to skip */
-    define public property Skip as int64 no-undo get. set. 
+    define public property Skip as int64 no-undo 
+        get():
+            if this-object:skip = ? then 
+                return 0.
+            return this-object:skip.
+        end.     
+        set. 
     
     /* Returns the name of the ProDataset Table */
     define public property TableName as character no-undo 
         get.
         private set. 
     
-    define public property ClientOnly     as logical no-undo  get. set.
-    define public property FindUnique     as logical no-undo  get. set.
-    define public property Count          as logical no-undo  get. set.
-    define public property PageBackward   as logical no-undo  get. set.
-    define public property ExternalPaging as logical no-undo  get. set.
+    define public property ClientOnly      as logical no-undo  get. set.
+    define public property FindUnique      as logical no-undo  get. set.
+    define public property Count           as logical no-undo  get. set.
+    define public property PageBackward    as logical no-undo  get. set.
+    define public property ExternalPaging  as logical no-undo  get. set.
     
     // set to true by DataRequestBuilder so the server can identify where to support innerjoin  
     define public property IsMainTable    as logical no-undo  get. set.

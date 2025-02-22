@@ -87,11 +87,14 @@ class Pmfo.Core.Common.FieldValue implements IFieldValue:
         if super:Equals(PO) then
             return true.
         
-        if type-of(PO, IFieldValue) then
+        if type-of(PO,IFieldValue) then
         do:
-            if cast(PO, IFieldValue):Name = this-object:Name
-            and type-of(PO,IPrimitiveHolder) then 
-                return cast(PO,IPrimitiveHolder):Equals(PO).      
+            if cast(PO, IFieldValue):Name = this-object:Name then 
+            do:
+                if type-of(PO,IFieldValue) then 
+                    return this-object:Value:Equals(cast(PO,IFieldValue):Value).
+                    
+            end.          
         end.
         return false.
     end method.

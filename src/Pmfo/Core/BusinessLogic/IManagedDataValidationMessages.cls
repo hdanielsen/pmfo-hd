@@ -42,7 +42,9 @@ interface Pmfo.Core.BusinessLogic.IManagedDataValidationMessages:
         input phHandle               as handle):
     
     method public void Add(pKey as integer,pMessage as character).
-         
+    // allow adding one or more keys after 
+    method public void Add(pKey as integer).
+    
     // use when keys does not need to be logged since they will be extracted from the buffer passed to ProcessSuperOverride
     method public logical Add(pMessage as character).
     

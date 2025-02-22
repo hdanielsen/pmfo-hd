@@ -140,6 +140,7 @@ using Pmfo.Core.BusinessLogic.Delegate.IGetInternalDataDelegator from propath.
 using Pmfo.Core.BusinessLogic.Delegate.IGetInternalDataDelegate from propath.
 using Pmfo.Core.BusinessLogic.Delegate.IValidateDelegator from propath.
 using Pmfo.Core.BusinessLogic.Delegate.IValidateDelegate from propath.
+using Pmfo.Core.Error.QuestionError from propath.
  
 class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService implements IBusinessEntity, IFetchDelegator, ISubmitDelegator, IGetInternalDataDelegator, IValidateDelegator:
  
@@ -853,9 +854,9 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
             oFindService:AssertFind(oRelation:name,oQueryentry).
             catch eNotFound as TableNotFoundError:
                 if phbuffer:row-state = row-modified or phbuffer:row-state = row-created then 
-                   ThrowBufferError(phbuffer, eNotFound:GetStrippedMessage()).
+                   ThrowBufferError(phbuffer, eNotFound:GetMessage(1)).
                 else   
-                   undo, throw new BadRequestError(eNotFound:GetStrippedMessage()).    
+                   undo, throw new BadRequestError(eNotFound:GetMessage(1)).    
             end catch. 
         end.
     end method.     
@@ -2305,10 +2306,9 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
                 catch eval as ValidationError:
                     if phDataset:error then 
                         lError = true.
-                    // just throw validation failed if no dataset errors     
-                    else do:
-                        undo, throw eval.
-                    end.           
+                    // rethrow or rethrow as Qquestion if question       
+                    else 
+                         HandleValidationError(eval).         
                 end catch.
             end.
             // last check for the update request (after all BEs needed on client have been started) 
@@ -2331,9 +2331,9 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
                     catch eval as ValidationError:
                         if phDataset:error then 
                             lError = true.
-                         // just throw validation failed if no dataset errors     
+                        // rethrow or rethrow as Qquestion if question       
                         else 
-                            undo, throw eval.        
+                            HandleValidationError(eval).       
                     end catch.                  
                 end.
             end.
@@ -2367,21 +2367,21 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
                         oMethod:Invoke(this-object,oparameterList).
                     lError = phDataset:error.
                     catch eval as ValidationError:
-                        if phDataset:error then 
+                       if phDataset:error then 
                             lError = true.
                         else if Datasets[1]:error then 
                         do:
                            phDataset:error = true. 
                            lError = true.    
                         end.   
-                        // just throw validation failed if no dataset errors     
+                        // rethrow or rethrow as Qquestion if question       
                         else 
-                           undo, throw eval.        
+                            HandleValidationError(eval). 
+                                 
                     end catch. 
                 end.
                 else do:
                     oResponse = SubmitData(poUpdateDataRequest, input-output dataset-handle phDataset by-reference).
-                    
                     // Need research on how to manage dataset error to the by-reference 
                     // from the return from DataAccess input-output deep copy ) - bug?
                     // This is a workaround in the DataAccess  
@@ -2408,7 +2408,7 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
                 oReceiveError = e2.
             end catch.
         end. 
-        
+       
         if valid-object(oError) then
             undo, throw oError.
         
@@ -2457,6 +2457,19 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
             isInfrastructureServiceStarted = false.
                
         end finally.     
+    end method.
+    
+    method protected void HandleValidationError(pValidationError as ValidationError):
+        define variable oErrorProcessor as JsonDatasetErrorProcessor no-undo.
+        define variable oError          as Error no-undo.
+        if type-of(pValidationError,QuestionError) then
+        do: 
+            oErrorProcessor  = new JsonDatasetErrorProcessor().
+            oError = oErrorProcessor:CreateQuestionError(cast(pValidationError,QuestionError)).
+            undo, throw oError. 
+        end.
+        else
+            undo, throw pValidationError.  
     end method.
     
     // allow ooverride for complex relations 
@@ -2888,14 +2901,20 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
     method protected void AddAndThrowBufferQuestion(phBuffer as handle, pId as integer, pMessage as character):
         define variable iMin as integer no-undo.
         define variable iMax as integer no-undo.
-        if phBuffer:dataset:error   then      
+        
+        if valid-handle(phBuffer:dataset) and phBuffer:dataset:error   then    
+        do: 
             undo, throw new ValidationError(). 
+        end.
         if pid < 1 then 
             undo, throw new IllegalArgumentError(subst("Question Id &1 is invalid. The number must be greater than 0.",pId)). 
-        
-        ErrorStringUtil:AddQuestion(phBuffer, pId + ReservedConfirmationNumbers, pMessage).
-         
-        undo, throw new ValidationError(). // UpdateData gets the errors added by ErrorString to the dataset  if dataset:error  is true 
+       
+        if valid-handle(phBuffer) and phBuffer:avail then  
+             ErrorStringUtil:AddQuestion(phBuffer, pId + ReservedConfirmationNumbers, pMessage).
+        undo, throw new QuestionError(phBuffer:table-handle:serialize-name,
+                                      pId + ReservedConfirmationNumbers,
+                                      pMessage
+                                 ). // UpdateData gets the errors added by ErrorString to the dataset  if dataset:error  is true 
     end method.
     
     method protected logical IsQuestionConfirmed(pId as integer,pUpdateRequest as IUpdateDataRequest):

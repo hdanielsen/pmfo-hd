@@ -77,7 +77,7 @@ class Pmfo.Core.DataLayer.AbstractFieldProxy abstract implements IFieldProxy:
     end method.    
     
     // allow subclasses to override to track other tt fields   
-    method protected void Preparebuffer(phDataBuffer as handle):
+    method protected void PrepareBuffer(phDataBuffer as handle):
     end method.
     
     // allow subclasses to override to track other db fields   
@@ -208,6 +208,13 @@ class Pmfo.Core.DataLayer.AbstractFieldProxy abstract implements IFieldProxy:
     
     method public abstract logical Save().
     method protected abstract logical Conflict(phField as handle).
+    
+    method public logical NeedsSave().
+         return this-object:field:buffer-handle:row-state = row-created
+                or 
+                this-object:Field:buffer-value <> this-object:BeforeField:buffer-value.
+    end method.
+    
     
     method public final logical Conflict():
         if this-object:Field:buffer-handle:row-state = row-created 

@@ -35,7 +35,9 @@ class Pmfo.Core.BusinessLogic.GetDataTableResponse inherits GetDataTableResponse
     
     // CSV of tt extent fields that should be trimmed (removing null) 
     define public property TrimExtentFields as character no-undo get. set.  
-    
+    // force use of nextpagelink when nextPagingContext has a value
+    define public property UseNextPageLink as logical no-undo  get. set.  
+  
     /* Returns the number of results for this table */
     define public property NumResults as int64 no-undo get. set. 
         

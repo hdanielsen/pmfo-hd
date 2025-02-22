@@ -34,7 +34,9 @@ interface Pmfo.Core.DataLayer.IFieldProxy:
     define public property Prepared  as logical   no-undo get. 
    
     method logical Conflict().                   
-    method logical Save().                    
+    method logical Save().        
+    method logical NeedsSave().        
+                
     method logical Prepare(phDataBuffer as handle, phDatabaseBuffer as handle).
     
    
