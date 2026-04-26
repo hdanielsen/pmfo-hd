@@ -15,7 +15,7 @@ block-level on error undo, throw.
 using Pmfo.Core.BusinessLogic.ClientBusinessEntity from propath.
 using Pmfo.Core.Common.ServerTypeEnum from propath.
 
-class Pmfo.Core.BusinessLogic.MemoryObjectBE abstract inherits ClientBusinessEntity: 
+class Pmfo.Core.BusinessLogic.MemoryObjectBE  inherits ClientBusinessEntity: 
     {Pmfo/Core/schema/memoryObject.i}
         
     define dataset dsMemoryObject for ttMemoryObject

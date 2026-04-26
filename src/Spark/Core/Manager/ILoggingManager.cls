@@ -1,4 +1,6 @@
 using Ccs.Common.IManager from propath.
+using OpenEdge.Web.IWebRequest from propath.
+
 //using Spark.Core.Util.ErrorTypeEnum from propath.
 
 /**
@@ -6,7 +8,19 @@ using Ccs.Common.IManager from propath.
  */
 interface Spark.Core.Manager.ILoggingManager inherits IManager:
 
-    define public property oLogConfig as Progress.Json.ObjectModel.JsonObject no-undo get. set.
+    // performance attribute - set to true if any type of logging is activated for the 
+    // web request  
+    define public property IsWebRequestLogActive as logical no-undo get. set.
+    define public property LogEveryWebRequest    as logical no-undo get. set.
+    define public property ProfileEveryWebRequest    as logical no-undo get. set.
+    define public property DBIfilesize as logical no-undo get. set.
+    define public property DBIABLApp as character no-undo get. set.
+    method public void LogWebRequest(pWebRequest as IWebRequest ).
+    method public void LogWebRequestToSeq(pWebRequest as IWebRequest ).
+    method public void LogDBIFileSizeToSeq(pcWebAppName as character).
+    method public void EnableProfilerWebRequest(pWebRequest as IWebRequest ).
+    method public void DisableProfilerWebRequest().
+
 
     /**
      * Log a message to the appserver logfile.

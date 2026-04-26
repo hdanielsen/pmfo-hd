@@ -760,8 +760,6 @@ class Pmfo.Util.JsonReader:
                     end.    
                     // allow readers to throw unprocecsable
                     catch eUnpErr as UnprocessableEntityError:
-                        message "catch"
-                        view-as alert-box.
                         undo, throw eUnpErr.
                     end.    
                     
@@ -784,8 +782,7 @@ class Pmfo.Util.JsonReader:
                             // TODO  improve message to show key values ...
                             undo, throw new UnprocessableEntityError(subst("&1 object found with duplicate key values in node &2",phBuffer:serialize-name,i)).     
                         end.
-                         message "catch 3" e3:GetClass():Typename
-                         view-as alert-box.
+                         
                         undo,throw new ApplicationError(subst("Failed to read '&1' from json",phBuffer:serialize-name),e3).
                     end catch.
                 end.

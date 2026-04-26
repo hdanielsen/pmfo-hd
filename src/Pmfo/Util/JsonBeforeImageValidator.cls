@@ -35,13 +35,13 @@ class Pmfo.Util.JsonBeforeImageValidator inherits JsonParser:
     define private variable RequestedBuffer as handle no-undo.
     define private variable WebMethod as character no-undo.
      
-    define temp-table ttAfter 
+    define temp-table ttAfter no-undo 
         field name as character
         field rowstate as integer
         field key as character
         index key as primary unique key.
     
-    define temp-table ttBefore
+    define temp-table ttBefore no-undo
         field name as character 
         field key as character
         field rowstate as integer

@@ -225,5 +225,8 @@ implements ICollection:
         end.
     end method.
     
+    method public logical AddNull( ):
+        return error new UnsupportedOperationError('AddNull', this-object:GetClass():TypeName).
+    end method.
     
 end class.

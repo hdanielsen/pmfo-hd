@@ -252,22 +252,12 @@ class Pmfo.Core.BusinessLogic.ServiceEntity inherits DataService implements ISer
          WarningMessages:Add(Resource, pcMsg).
     end method. 
     
-    method protected void AddDeprecatedWarningAndLog(pcWarning as character, pcLogMessage as character):
-        if pcWarning > "" then
-        do:
-            if pcLogMessage > "" then
-                pcWarning = subst("&1 &2",pcWarning,"A note has been written to the log to inform IT about this.").
-            else 
-                pcLogMessage = pcWarning.           
-            
-            AddWarning(pcWarning).
-            if session:remote then 
-                message pcLogMessage.
-            else     
-                message pcLogMessage
-                        view-as alert-box warning title "Log Message - Written to Log from Remote Session".           
-       end.    
-        
+    method protected void AddDeprecatedLog(pcLogMessage as character):
+        if session:remote then 
+            message pcLogMessage.
+        else     
+            message pcLogMessage
+                    view-as alert-box warning title "Log Message - Will be written to log from Remote Session".           
     end.    
     
     method public override void Initialize():

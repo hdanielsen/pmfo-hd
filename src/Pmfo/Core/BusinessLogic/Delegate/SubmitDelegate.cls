@@ -18,6 +18,7 @@ using Pmfo.Core.BusinessLogic.IBusinessEntity from propath.
 using Pmfo.Core.BusinessLogic.IClientEntity from propath.
 using Pmfo.Core.BusinessLogic.IUpdateDataRequest from propath.
 using Pmfo.Core.Common.IWarningMessageTableHolder from propath.
+using Pmfo.Core.Common.WarningMessages from propath.
 using Pmfo.Core.DataLayer.IDataAccess from propath.
 using Pmfo.Core.Error.ApplicationError from propath.
 using Pmfo.Core.Error.NotFoundError from propath.
@@ -96,11 +97,15 @@ class Pmfo.Core.BusinessLogic.Delegate.SubmitDelegate implements ISubmitDelegate
                     poUpdateDataRequest:AddCheckReadOnlyTable(hBuffer:table-handle:name).
             end.
         end. 
-        
-        if valid-object(pDelegator:WarningMessages) then
-            hWarning = cast(pDelegator:WarningMessages,IWarningMessageTableHolder):TableHandle.
+ 
+        // if somehow called with no Warning messages add the class here 
+        // so that we do not get a leak from ouput table-handle hWarning 
+        // This also ensures that data any access warnings will be captured  
+        if not valid-object(pDelegator:WarningMessages) then
+            pDelegator:WarningMessages = new WarningMessages(phDataset). 
          
-                                                                                
+        hWarning = cast(pDelegator:WarningMessages,IWarningMessageTableHolder):TableHandle.    
+                                                                              
         // infrastructure data are data that are not managed as regular crud, but that
         // may track and hold infrastructure information for all regular crud   
         if pDelegator:IsInfrastructureServiceStarted then 
@@ -109,11 +114,10 @@ class Pmfo.Core.BusinessLogic.Delegate.SubmitDelegate implements ISubmitDelegate
           // allow ClientOnly to handle save after all data is validated by DatasetUpdateManager
         if type-of(pDelegator,IClientEntity) then 
             oResponse = cast(pDelegator,IClientEntity):SubmitClientData(poUpdateDataRequest, input-output dataset-handle phDataset by-reference, input dataset-handle hInfrastructureDataset,output table-handle hWarning append ).        
-        else
+        else 
             oResponse = pDataAccess:SubmitData(poUpdateDataRequest, input-output dataset-handle phDataset, input dataset-handle hInfrastructureDataset, output table-handle hWarning append).        
         
         return oResponse.
-        
         finally:
             if pDelegator:IsInfrastructureServiceStarted then 
             do:

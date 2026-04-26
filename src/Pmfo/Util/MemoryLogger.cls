@@ -26,7 +26,7 @@ block-level on error undo, throw.
 class Pmfo.Util.MemoryLogger abstract implements IMemoryLogger: 
        
     {Pmfo/Core/schema/memoryObject.i}
-    define temp-table bttMemoryObject like ttMemoryObject.
+    define temp-table bttMemoryObject no-undo like ttMemoryObject.
     
     define protected property MemoryObjectsFileName as character no-undo get. set.
     
@@ -72,6 +72,7 @@ class Pmfo.Util.MemoryLogger abstract implements IMemoryLogger:
                  buffer ttMemoryObject:buffer-copy(buffer bttMemoryObject:handle).
                  LogLeak(buffer ttMemoryObject,
                          dtRequestTime,
+                         if valid-object(poWebRequest) then poWebRequest:Method else "",
                          if valid-object(poWebRequest) then poWebRequest:URI:ToString() else "").
                 
              end.    
@@ -117,11 +118,12 @@ class Pmfo.Util.MemoryLogger abstract implements IMemoryLogger:
 /*                                                                                                                                                                       */
 /*     end method.*/
          
-     method protected void LogLeak(buffer ttMemoryObject for ttMemoryObject,pTime as datetime,pcURi as character):
+     method protected void LogLeak(buffer ttMemoryObject for ttMemoryObject,pTime as datetime,pcMethod as character, pcURi as character):
          output to value(MemoryObjectsFileName) unbuffered no-echo append.
 /*         find ttMemoryLeakLog where ttMemoryLeakLog.contextId = ContextId no-error.                               */
 /*         output to value(ttMemoryLeakLog.logFile) unbuffered append.                                              */
-         put unformatted pTime " " pcURi subst(" Session: &1 &2: &3 &4 &5 Parent: &6 Info: &7",
+         put unformatted pTime " " pcMethod " " pcURi 
+                         subst(" Session: &1 &2: &3 &4 &5 Parent: &6 Info: &7",
                                session:current-request-info:SessionID,
                                ttMemoryObject.type,
                                ttMemoryObject.handle,
@@ -130,9 +132,7 @@ class Pmfo.Util.MemoryLogger abstract implements IMemoryLogger:
                                ttMemoryObject.parentHandle,
                                ttMemoryObject.info
                                )
-                           skip.
-
-          
+                          skip.
          finally:
              output close.
          end.  

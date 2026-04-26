@@ -36,7 +36,7 @@ class Pmfo.Core.Service.JsonDatasetErrorProcessor:
     define protected variable JsonErrors as JsonObject no-undo.
     
     // the serialize-name is for import 
-    define temp-table ttError 
+    define temp-table ttError no-undo 
         field prodsId    as character serialize-name "prods:id"
         field prodsError as character serialize-name "prods:error"
        

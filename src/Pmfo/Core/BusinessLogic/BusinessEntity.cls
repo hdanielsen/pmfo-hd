@@ -2289,8 +2289,8 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
         define variable oDatasetManager  as IDatasetUpdateManager no-undo.
         define variable oScope as LifecycleScope no-undo.
         define variable oValidateRequestPlugin as IValidateUpdateRequestPlugin no-undo.
-        define variable cActionWarning as character no-undo.    
-        define variable cActionWarningLog as character no-undo.    
+        define variable cActionDeprecatedLog as character no-undo.   
+         
         Assert:NotNull(phdataset,"Dataset passed to UpdateData").
         Assert:NotNull(poUpdateDataRequest,"UpdateDataRequest passed to UpdateData").
         
@@ -2340,20 +2340,25 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
             else do:
                 if cast(poUpdateDataRequest:CustomRequest,IAction):IsDeprecated then
                 do:
-                    cActionWarning = subst("The &1 &2 is marked as deprecated. It still works but should be replaced by IT.",
-                               this-object:Resource,
-                               cast(poUpdateDataRequest:CustomRequest,IAction):name
-                              ).
-                    cActionWarningLog = subst("The &1 &2 is marked as deprecated. &2. &3",
+                    cActionDeprecatedLog = trim(subst("The &1 &2 action is marked as deprecated.&3&4",
                                                this-object:Resource,
                                                cast(poUpdateDataRequest:CustomRequest,IAction):name,
                                                if cast(poUpdateDataRequest:CustomRequest,IAction):DeprecatedWarning > ""                                                
-                                               then cast(poUpdateDataRequest:CustomRequest,IAction):DeprecatedWarning
-                                               else "It still works.",
+                                               then substitute(" &1.",
+                                                        StringUtil:UpperCaseFirst( 
+                                                            right-trim(cast(poUpdateDataRequest:CustomRequest,IAction):DeprecatedWarning,".")
+                                                        )
+                                                    )           
+                                               else "",
                                                if cast(poUpdateDataRequest:CustomRequest,IAction):DeprecatedRemoveCallInfo > ""                                                
-                                               then cast(poUpdateDataRequest:CustomRequest,IAction):DeprecatedRemoveCallInfo
-                                               else "It should be replaced/eliminated."
-                                              ).
+                                               then substitute(" &1.",
+                                                        StringUtil:UpperCaseFirst( 
+                                                           right-trim(cast(poUpdateDataRequest:CustomRequest,IAction):DeprecatedRemoveCallInfo,".")
+                                                        )     
+                                                    )          
+                                               else ""
+                                              )
+                                          ).
                 end.    
             end.           
             if not phDataset:error then
@@ -2430,8 +2435,8 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
             do: 
                 if valid-object(cast(poUpdateDataRequest:CustomRequest,IAction):SuccessRowState) then
                     PrepareSuccessMessages(cast(poUpdateDataRequest:CustomRequest,IAction),poUpdateDataRequest:MainRequestedBuffer, phDataset).          
-                if cActionWarning > "" then
-                    AddDeprecatedWarningAndLog(cActionWarning,cActionWarningLog).
+                if cActionDeprecatedLog > "" then
+                    AddDeprecatedLog(cActionDeprecatedLog).
             end. 
         end.   
         
@@ -2823,6 +2828,8 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
         // - cellect many errors and return table, key and field info   
         if phBuffer:row-state = 0 then 
             undo, throw new BadRequestError(pcMsg).
+        if not valid-handle(phBuffer:dataset) then 
+            undo, throw new BadRequestError(pcMsg).
                
         ErrorStringUtil:AddError(phBuffer, pcMsg).
     end method.    
@@ -2831,12 +2838,16 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
         // the ErrorStringUtil only works  with changed records that has error attributes 
         if phBuffer:row-state = 0 then 
             undo, throw new BadRequestError(pcMsg).
+        if not valid-handle(phBuffer:dataset) then 
+            undo, throw new BadRequestError(pcMsg).
         ErrorStringUtil:AddError(phBuffer, pcMsg, pcField).
     end method.    
     
     method protected void ThrowBufferError(phBuffer as handle,pcMsg as character):
         // the ErrorStringUtil only works  with changed records that has error attributes 
         if phBuffer:row-state = 0 then 
+            undo, throw new BadRequestError(pcMsg).
+        if not valid-handle(phBuffer:dataset) then 
             undo, throw new BadRequestError(pcMsg).
         ErrorStringUtil:AddError(phBuffer, pcMsg).
         undo, throw new ValidationError().
@@ -2845,6 +2856,8 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
     method protected void ThrowBufferError(phBuffer as handle,pcMsg as character, pcField as character):
         // the ErrorStringUtil only works  with changed records that has error attributes 
         if phBuffer:row-state = 0 then 
+            undo, throw new BadRequestError(pcMsg).
+        if not valid-handle(phBuffer:dataset) then 
             undo, throw new BadRequestError(pcMsg).
         ErrorStringUtil:AddError(phBuffer, pcMsg, pcField).
         undo, throw new ValidationError().
@@ -3081,22 +3094,12 @@ class Pmfo.Core.BusinessLogic.BusinessEntity abstract inherits DataService imple
         AllDataIsFetched = false.   
     end. 
     
-    method protected void AddDeprecatedWarningAndLog(pcWarning as character, pcLogMessage as character):
-        if pcWarning > "" then
-        do:
-            if pcLogMessage > "" then
-                pcWarning = subst("&1 &2",pcWarning,"A note has been written to the log to inform IT about this.").
-            else 
-                pcLogMessage = pcWarning.           
-            
-            AddWarning(pcWarning).
-            if session:remote then 
-                message pcLogMessage.
-            else     
-                message pcLogMessage
-                        view-as alert-box warning title "Log Message - Will be written to log from Remote Session".           
-       end.    
-        
+    method protected void AddDeprecatedLog(pcLogMessage as character):
+        if session:remote then 
+            message pcLogMessage.
+        else     
+            message pcLogMessage
+                    view-as alert-box warning title "Log Message - Will be written to log from Remote Session".           
     end.    
       
     // overide to call any stuff needed by catalog that is lazy loaed (actions, functions)

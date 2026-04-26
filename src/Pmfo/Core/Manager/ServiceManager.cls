@@ -100,6 +100,8 @@ using Pmfo.Core.Error.IllegalOperationError from propath.
 using Pmfo.Core.BusinessLogic.IRelation from propath.
 using Pmfo.Core.Common.IPasswordRules from propath.
 using Pmfo.Util.IMemoryLogger from propath.
+using Pmfo.Repository.DataSource.DataSourceErrorDS from propath.
+using Pmfo.Core.Error.DataSourceNotFoundByPublicNameError from propath.
 
 // There are tow different canFind implementaions. 
 // One that uses can-find and one that uses find sonce can-find is faster we want 
@@ -292,12 +294,11 @@ class Pmfo.Core.Manager.ServiceManager inherits Manager implements IServiceManag
            return MemoryLogger.   
        end.
        set. 
-     
+    
     // not in interface as of current - override in subclass initialize
     define public property CodeTableKeyType as character init "character" no-undo 
        get.
        protected set. 
-    
     
     /*------------------------------------------------------------------------------
      Purpose:
@@ -812,6 +813,12 @@ class Pmfo.Core.Manager.ServiceManager inherits Manager implements IServiceManag
     method protected DataSourceDS CreateDataSourceDS():
         return new DataSourceDS().       
     end method.
+    
+     // allow subvlass override
+    method protected DataSourceErrorDS CreateDataSourceErrorDS():
+        return new DataSourceErrorDS().       
+    end method.
+      
       
      // allow subvlass override
     method protected DataAccessDS CreateDataAccessDS():
@@ -848,7 +855,8 @@ class Pmfo.Core.Manager.ServiceManager inherits Manager implements IServiceManag
     end method.
         
     method public final IDataSource CreateDataSource( input pcName as character ):
-        define variable oSource as IDataSource no-undo.
+        define variable oSource  as IDataSource no-undo.
+        define variable cMessage as character no-undo.
         
         // The meta classes cannot be managed by the temp-table since they create them 
         // handle them here to allow override in application 
@@ -859,9 +867,14 @@ class Pmfo.Core.Manager.ServiceManager inherits Manager implements IServiceManag
             return CreateEntityDS().       
         else if pcName = "dataAccess" then 
             return CreateDataAccessDS().
-        // used in resource.json generation, ans must wrok if there is none    
+        // used in resource.json generation, and must work if there is none    
         else if pcName = "lookupTypes" then 
             return CreateLookupTypeDS().
+        // used in resource.json generation will be called to cleanup existing
+        // records may be added when generating datasource and a source cannot be found 
+        // May not be an error, but could be)    
+        else if pcName = "dataSourceErrors" then
+            return CreateDataSourceErrorDS().
          
         RefreshResources().          
         
@@ -893,10 +906,30 @@ class Pmfo.Core.Manager.ServiceManager inherits Manager implements IServiceManag
             return osource.
             
         end.
-        else 
-            undo, throw new NotFoundError(subst('DataSource "&1"',pcName)).
+        else do:
+            find ttDataSourceError where ttDataSourceError.EntityName = pcName no-error.
+            if available ttDataSourceError then 
+            do: 
+                // will also write to the log 
+                WriteDataSourceErrorToTheLog(pcName).
+                undo, throw new DataSourceNotFoundByPublicNameError(pcName,true). // true add time to message
+            end.     
+            else
+                undo, throw new NotFoundError(subst('DataSource "&1"',pcName)).
+        end.    
         return ?. 
     end method.
+    
+     // substituted in WriteDataSourceErrorToTheLog. Override in subclass for correct name
+    method protected character GetCodeTableKeyFieldText():
+         return "Lookup table character key field".  
+    end method.
+    
+    method protected void WriteDataSourceErrorToTheLog(pcName as character):
+        message subst("Could not create DataSource using public name '&1'. This most likely that the &2 value has been changed. It could also mean that a table name has changed or the DataSource was missing when resources.json was generated.",
+                      pcName,
+                      GetCodeTableKeyFieldText()). 
+    end method.                
     
     method protected OpenEdge.Web.DataObject.DataObjectService CreateDataObjectService(pcName as character):
         return new DataObjectService(pcName).
@@ -1287,7 +1320,7 @@ class Pmfo.Core.Manager.ServiceManager inherits Manager implements IServiceManag
         if cKeyList > "" then
             cKeys = Array:Split(cKeylist).
         return cKeys.    
-    end method.   
+    end method. 
     
     method public character GetKeyList(input pcName as character).
         define variable cKeyList as character  no-undo.

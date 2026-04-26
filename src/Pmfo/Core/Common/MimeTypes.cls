@@ -7,6 +7,7 @@
     Author(s)   : hdaniels
     Created     : Fri Jun 04 12:21:45 EDT 2021
     Notes       : 
+    06/20/25 jhl 9829 Added doc and ppt mimetypes
   ----------------------------------------------------------------------*/
 
  
@@ -113,6 +114,8 @@ class Pmfo.Core.Common.MimeTypes implements IMimeTypes:
         ImageMap:put("application/vnd.openxmlformats-officedocument.presentationml.template","potx").
         ImageMap:put("application/vnd.openxmlformats-officedocument.presentationml.slideshow","ppsx").
         ImageMap:put("application/vnd.ms-excel","xls").
+        ImageMap:put("application/msword","doc").
+        ImageMap:put("application/vnd.ms-powerpoint","ppt").
         ImageMap:put("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","xlsx").
         ImageMap:put("application/vnd.openxmlformats-officedocument.spreadsheetml.template","xltx").
         ImageMap:put("audio/mpeg","mp3").

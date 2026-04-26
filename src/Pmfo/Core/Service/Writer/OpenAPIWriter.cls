@@ -105,7 +105,7 @@ class Pmfo.Core.Service.Writer.OpenAPIWriter abstract inherits DataService:
         index key as primary unique parentKey childKey key isAction.
          
      //same as ttLinlkedmember. but separate since it creat4d once and never deleted      
-    define temp-table ttFixedLinkedMember like ttLinkedMember. 
+    define temp-table ttFixedLinkedMember no-undo like ttLinkedMember. 
       
     define protected property schemas  as JsonObject no-undo get. set.
     // TODO - define as abstract in psi version of SwaggerJsonWriter 

@@ -36,6 +36,7 @@ using Pmfo.Repository.DataAccess.ResourceDA from propath.
 using Progress.Lang.Object from propath.
 using Pmfo.Repository.Error.CorruptResourcesError from propath.
 using Pmfo.Core.Common.WarningMessages from propath.
+using Pmfo.Util.StringUtil from propath.
 
 class Pmfo.Repository.Business.ResourceBE inherits BusinessEntity: 
     
@@ -105,6 +106,7 @@ class Pmfo.Repository.Business.ResourceBE inherits BusinessEntity:
         define variable hDataset              as handle no-undo.
         define variable hEntityTable          as handle no-undo.
         define variable hDataSourceTable      as handle no-undo.
+        define variable hDataSourceErrorTable as handle no-undo.
         define variable hLookupTypeTable      as handle no-undo. 
                 
         hDataset = Datasets[1].
@@ -117,11 +119,12 @@ class Pmfo.Repository.Business.ResourceBE inherits BusinessEntity:
         cast(this-object:DataAccess,ResourceDA):FetchData(oGetDataRequest, input-output dataset-handle hDataset by-reference).  
         hEntityTable = hDataset:get-buffer-handle("ttEntity"):table-handle.
         hDataSourceTable = hDataset:get-buffer-handle("ttDataSource"):table-handle.
+        hDataSourceErrorTable = hDataset:get-buffer-handle("ttDataSourceError"):table-handle.
         // fetch all lookup types from the lookup table  
         FetchLookupTypes(output table-handle hLookupTypeTable ).
         WarningMessages = new WarningMessages(hdataset). 
         // Add datasourced of type "CodeTable" from Lookuptypes and type "Table" using DataAdminService  
-        AddDynamicDataSources(input table-handle hEntityTable by-reference, input table-handle hDataSourceTable by-reference, input table-handle hLookupTypeTable by-reference ).
+        AddDynamicDataSources(input table-handle hEntityTable by-reference, input table-handle hDataSourceTable by-reference, input table-handle hLookupTypeTable by-reference, input table-handle hDataSourceErrorTable by-reference).
         // save to resources.json
         UpdateData(input-output dataset-handle hDataset by-reference). 
         empty temp-table ttTableMap.
@@ -136,7 +139,8 @@ class Pmfo.Repository.Business.ResourceBE inherits BusinessEntity:
         define variable hEntityTable          as handle no-undo.
         define variable hDataSourceTable      as handle no-undo.
         define variable hLookupTypeTable      as handle no-undo. 
-                
+        define variable hDataSourceErrorTable as handle no-undo.        
+        
         hDataset = Datasets[1].
         extent(oGetDataTableRequests) = hDataset:num-buffers.
         do i = 1 to hDataset:num-buffers:
@@ -147,16 +151,25 @@ class Pmfo.Repository.Business.ResourceBE inherits BusinessEntity:
         cast(this-object:DataAccess,ResourceDA):FetchData(oGetDataRequest, input-output dataset-handle hDataset by-reference).  
         hEntityTable = hDataset:get-buffer-handle("ttEntity"):table-handle.
         hDataSourceTable = hDataset:get-buffer-handle("ttDataSource"):table-handle.
+        hDataSourceErrorTable = hDataset:get-buffer-handle("ttDataSourceError"):table-handle.
         // fetch all lookup types from the lookup table  
         FetchLookupTypes(output table-handle hLookupTypeTable ).
         // Add datasourced of type "CodeTable" from Lookuptypes and type "Table" using DataAdminService  
-        AddDynamicDataSources(input table-handle hEntityTable by-reference, input table-handle hDataSourceTable by-reference, input table-handle hLookupTypeTable by-reference ).
-        // save to resources.json
+        AddDynamicDataSources(input table-handle hEntityTable by-reference, input table-handle hDataSourceTable by-reference, input table-handle hLookupTypeTable by-reference, input table-handle hDataSourceErrorTable by-reference).
+    // save to resources.json
         UpdateData(input-output dataset-handle hDataset by-reference). 
         empty temp-table ttTableMap.    
     end method.
     
-    method protected void AddDynamicDataSources(input table ttEntity, input table ttDataSource, input table ttLookupType):
+    method protected void AddDynamicDataSources(
+        input table ttEntity, 
+        input table ttDataSource, 
+        input table ttLookupType, 
+        input table ttDataSourceError
+        ):
+        
+        define buffer bttChildEntity for ttentity.
+            
         define variable i as integer no-undo.
         define variable cEntity as character no-undo.
         define variable lok as logical no-undo.
@@ -165,30 +178,75 @@ class Pmfo.Repository.Business.ResourceBE inherits BusinessEntity:
         for each ttEntity where ttEntity.TypeName = get-class(IBusinessEntity):TypeName: 
             if ttEntity.IsDataContainer = false and not can-find(ttDataSource where ttDataSource.EntityName = ttEntity.Resource) then
             do:  
-                lOk = AddDynamicDataSource(ttEntity.Resource, input table ttEntity by-reference,input table ttDataSource by-reference, input table ttLookupType by-reference,input table ttTablemap by-reference).
-/*                if lok = false and ttEntity.ClientOnly = false then                                       */
-/*                   AddWarning(subst("Business Entity '&1' does not have a DataSource",ttEntity.Resource)).*/
+                lOk = AddDynamicDataSource(ttEntity.Resource, 
+                                           input table ttEntity by-reference,
+                                           input table ttDataSource by-reference, 
+                                           input table ttLookupType by-reference,
+                                           input table ttTablemap by-reference 
+                                           ).
+                                          
+                if lok = false and ttEntity.ClientOnly = false then
+                    AddDataSourceError(ttEntity.Resource,false, input table ttDataSourceError by-reference).
+                     
             end.
             // check for datasets that uses include only 
             do i = 1 to num-entries(ttEntity.EntityReferences):
                 cEntity  = entry(i,ttEntity.EntityReferences).
                 if not can-find(ttDataSource where ttDataSource.EntityName = cEntity) then
                 do: 
-                    lok = AddDynamicDataSource(cEntity, input table ttEntity by-reference,input table ttDataSource by-reference, input table ttLookupType by-reference,input table ttTablemap by-reference).
-/*                    if lok = false then                                                                                                       */
-/*                    do:                                                                                                                       */
-/*                        //  Define a Data Source in the Public Names config (publicNames.json) or define the Business Entity as Client Only"  */
-/*                        find bttchildEntity where bttchildEntity.Resource = cEntity no-error.                                                 */
-/*                        if avail bttchildEntity = false or bttchildEntity.Clientonly = false then                                             */
-/*                            AddWarning(subst("Business Entity '&1' has a dataset entity '&2' with no data source",ttEntity.Resource,cEntity)).*/
-/*                    end.                                                                                                                      */
+                    lOk = AddDynamicDataSource(cEntity, 
+                                           input table ttEntity by-reference,
+                                           input table ttDataSource by-reference, 
+                                           input table ttLookupType by-reference,
+                                           input table ttTablemap by-reference 
+                                           ).
+       
+                    if lok = false then
+                    do:
+                        find bttchildEntity where bttchildEntity.Resource = cEntity no-error.
+                        if avail bttchildEntity = false or bttchildEntity.Clientonly = false then
+                            AddDataSourceError(cEntity,true, input table ttDataSourceError by-reference).
+                         
+                    end.
                 end.
             end.
                 
         end.    
     end method.     
     
-    method protected logical AddDynamicDataSource(input pcEntity as character, input table ttEntity, input table ttDataSource, input table ttLookupType, input table  ttTablemap  ):
+    // Create a DataSourceError record 
+    // NOTE that there are only considered errors when actually requested from ServiceManager:CreateDataSource
+    //      We do not log for client only, there may BEs that controls this with UpdateRequest:AddNoTargetTable 
+    //      There may also be BEs that uses the dtaa source of its super BE              
+    method protected void AddDataSourceError(
+        input pcEntity    as character,
+        input plContainer as logical,
+        input table ttDataSourceError
+        ): 
+        
+        find ttDataSourceError where ttDataSourceError.EntityName = pcEntity no-error.
+        if not available ttDataSourceError then
+        do: 
+           create ttDataSourceError.
+           assign ttDataSourceError.EntityName = pcEntity
+                  .
+        end. 
+        if plContainer then  
+            assign 
+                ttDataSourceError.NumContainerReferences = ttDataSourceError.NumContainerReferences + 1.  
+        else 
+            assign 
+                ttDataSourceError.IsRequestedByBusinessEntity = true.  
+         
+    end method.
+    
+    method protected logical AddDynamicDataSource(
+        input pcEntity as character, 
+        input table ttEntity, 
+        input table ttDataSource, 
+        input table ttLookupType, 
+        input table ttTablemap  
+          ):
         if not can-find(ttDataSource where ttDataSource.EntityName = pcEntity) then
         do: 
             find ttLookupType where ttLookupType.EntityName = pcEntity no-error.
@@ -216,8 +274,9 @@ class Pmfo.Repository.Business.ResourceBE inherits BusinessEntity:
                         ttDataSource.TableName  = ttTableMap.name 
                         ttDatasource.Type       = "Table".
                     return true.        
-                end.      
+                end. 
             end.
+            
             return false.    
         end. 
         return true.

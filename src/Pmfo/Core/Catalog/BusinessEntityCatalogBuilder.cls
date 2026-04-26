@@ -62,7 +62,7 @@ class Pmfo.Core.Catalog.BusinessEntityCatalogBuilder inherits ResourceCatalogBui
         end get.
     
     // used to sort properties 
-    define temp-table ttField 
+    define temp-table ttField no-undo
          field name as character
          field fieldhandle as handle 
          index name as primary unique name.          

@@ -9,7 +9,6 @@
     Notes       : Array utilities
   ----------------------------------------------------------------------*/
 
-
 block-level on error undo, throw.
 
 using Ccs.Common.Support.ICharacterArrayHolder from propath.
@@ -37,17 +36,31 @@ class Pmfo.Util.Array:
     {Pmfo/Util/toArrayMethods.i integer}
     {Pmfo/Util/toArrayMethods.i int64}
     {Pmfo/Util/toArrayMethods.i logical}
-    {Pmfo/Util/toArrayMethods.i Progress.Lang.Object} // organize using diesn ot see this
+    {Pmfo/Util/toArrayMethods.i Progress.Lang.Object} // use full name organize using does not work in include
     
     {Pmfo/Util/mergeArrayMethod.i character}
     {Pmfo/Util/mergeArrayMethod.i date}
     {Pmfo/Util/mergeArrayMethod.i datetime}
+    {Pmfo/Util/mergeArrayMethod.i datetime-tz}
     {Pmfo/Util/mergeArrayMethod.i decimal}
     {Pmfo/Util/mergeArrayMethod.i handle}
     {Pmfo/Util/mergeArrayMethod.i integer}
     {Pmfo/Util/mergeArrayMethod.i int64}
     {Pmfo/Util/mergeArrayMethod.i logical}
-    {Pmfo/Util/mergeArrayMethod.i Progress.Lang.Object} // organize using diesn ot see this
+  //  {Pmfo/Util/mergeArrayMethod.i longchar} - needs find which is a bit complicated with code page   
+    {Pmfo/Util/mergeArrayMethod.i Progress.Lang.Object} // use full name organize using does not work in include
+    
+    {Pmfo/Util/concatenateArrayMethod.i character}
+    {Pmfo/Util/concatenateArrayMethod.i date}
+    {Pmfo/Util/concatenateArrayMethod.i datetime}
+    {Pmfo/Util/concatenateArrayMethod.i datetime-tz}
+    {Pmfo/Util/concatenateArrayMethod.i decimal}
+    {Pmfo/Util/concatenateArrayMethod.i handle}
+    {Pmfo/Util/concatenateArrayMethod.i integer}
+    {Pmfo/Util/concatenateArrayMethod.i int64}
+    {Pmfo/Util/concatenateArrayMethod.i logical}
+    {Pmfo/Util/concatenateArrayMethod.i longchar}
+    {Pmfo/Util/concatenateArrayMethod.i Progress.Lang.Object} // use full name organize using does not work in include
     
     {Pmfo/Util/findArrayMethod.i character}
     {Pmfo/Util/findArrayMethod.i date}
@@ -59,12 +72,11 @@ class Pmfo.Util.Array:
     {Pmfo/Util/findArrayMethod.i int64}
     {Pmfo/Util/findArrayMethod.i logical}
     
-   //  assumed to be not needed - use  StringUtil:CompareClobValues 
-   //  method public static integer Find (pValue as longchar, pArray as longchar extent):
-   //
-      
-    // just implement this without the findArrayMethod include to use Equals - it is possible to do this based on
-    // preprocessor parameters but this seems clearer 
+    //  assumed to not be needed 
+    //  method public static integer Find (pValue as longchar, pArray as longchar extent):
+   
+    // Implement this without the findArrayMethod include to use Equals - it is possible to do this based on
+    // preprocessor parameters but it is messy - this is understandable 
     method public static integer Find (pValue as Progress.Lang.Object, pArray as Progress.Lang.Object extent):
         define variable i       as integer no-undo.
         do i = 1 to extent(pArray):
@@ -72,6 +84,32 @@ class Pmfo.Util.Array:
                 return i. 
         end.   
         return 0.        
+    end method.
+    
+    {Pmfo/Util/countArrayMethod.i character}
+    {Pmfo/Util/countArrayMethod.i date}
+    {Pmfo/Util/countArrayMethod.i datetime}
+    {Pmfo/Util/countArrayMethod.i datetime-tz}
+    {Pmfo/Util/countArrayMethod.i decimal}
+    {Pmfo/Util/countArrayMethod.i handle}
+    {Pmfo/Util/countArrayMethod.i integer}
+    {Pmfo/Util/countArrayMethod.i int64}
+    {Pmfo/Util/countArrayMethod.i logical}
+    
+    
+    //  assumed to not be needed 
+    //  method public static integer Count (pValue as longchar, pArray as longchar extent):
+   
+    // Implement this outside the countArrayMethod include to use Equals - it is possible to do this based on
+    // preprocessor parameters but it is messy - this is understandable 
+    method public static integer Count (pValue as Progress.Lang.Object, pArray as Progress.Lang.Object extent):
+        define variable iCount as integer no-undo.
+        define variable i      as integer no-undo.
+        do i = 1 to extent(pArray):
+            if pArray[i]:Equals(pValue) then 
+                iCount = iCount + 1. 
+        end.   
+        return iCount.        
     end method.
     
     {Pmfo/Util/compareArraysMethod.i character}
